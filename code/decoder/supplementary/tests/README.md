@@ -1,0 +1,1 @@
+Copied unchanged on 2026-10-11 from decoder's local scratch /home/claude/work/decoder/nonband/, so that the tests cited in `notes/decoder/willow_prereg.md` §9 entry 13 survive a lost disk; they run the local copies of the scripts and write under /home/claude/work/decoder/, so they do not run from here as they stand; md5s are in MD5SUMS.

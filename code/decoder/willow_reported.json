@@ -1,0 +1,27 @@
+{
+ "_source": "Acharya et al., arXiv:2408.13687v1 (Willow), read from the full PDF text [V] on 2026-10-08: Table S1 (Fig. 1d column), Table S5, main text p.2-3. Values are reported, not measured by us.",
+ "_eps_fit_method": "per code and basis, line through ln(1 - 2 pL) versus cycles t; eps = (1 - exp(slope))/2; excess residuals (drift) inflate the uncertainty; the mean over codes and bases has uncertainty sqrt(sum sigma_i^2)/n. Lambda: regression of ln eps_d on (d + 1)/2 with eps uncertainties, Lambda = exp(-slope).",
+ "_shots": "50,000 per (cycles, basis, code): 10 initialization bitstrings (5 random and their complements) x 5,000 repetitions",
+ "table_S1_fig1d": {
+  "libra": {"eps3": [7.12e-3, 0.06e-3], "eps5": [3.49e-3, 0.04e-3], "eps7": [1.71e-3, 0.03e-3], "Lambda": [2.04, 0.02]},
+  "nn":    {"eps3": [6.50e-3, 0.06e-3], "eps5": [3.03e-3, 0.03e-3], "eps7": [1.43e-3, 0.03e-3], "Lambda": [2.14, 0.02]}
+ },
+ "table_S5_nn_eps": {
+  "_note": "neural-network decoder, per grid and basis: [eps, std. dev.]; grid (a, b) <-> open-source label 'd<d> a+bj' (e.g. distance-3 (0, 4) <-> d3 0+4j)",
+  "d3 0+0j": {"X": [0.00561, 0.00013], "Z": [0.00516, 0.00008]},
+  "d3 0+4j": {"X": [0.00562, 0.00015], "Z": [0.00526, 0.00014]},
+  "d3 0+8j": {"X": [0.00519, 0.00012], "Z": [0.00475, 0.00021]},
+  "d3 4+0j": {"X": [0.00672, 0.00021], "Z": [0.00596, 0.00023]},
+  "d3 4+4j": {"X": [0.01044, 0.00045], "Z": [0.00800, 0.00030]},
+  "d3 4+8j": {"X": [0.00641, 0.00028], "Z": [0.00516, 0.00039]},
+  "d3 8+0j": {"X": [0.00678, 0.00030], "Z": [0.00724, 0.00024]},
+  "d3 8+4j": {"X": [0.00982, 0.00021], "Z": [0.00854, 0.00012]},
+  "d3 8+8j": {"X": [0.00507, 0.00015], "Z": [0.00533, 0.00014]},
+  "d5 0+0j": {"X": [0.00294, 0.00008], "Z": [0.00229, 0.00008]},
+  "d5 0+4j": {"X": [0.00311, 0.00007], "Z": [0.00238, 0.00009]},
+  "d5 4+0j": {"X": [0.00362, 0.00008], "Z": [0.00326, 0.00014]},
+  "d5 4+4j": {"X": [0.00352, 0.00008], "Z": [0.00309, 0.00009]},
+  "d7 0+0j": {"X": [0.00155, 0.00004], "Z": [0.00130, 0.00004]}
+ },
+ "detection_fraction": {"d3": 0.077, "d5": 0.085, "d7": 0.087}
+}

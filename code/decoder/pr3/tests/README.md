@@ -1,0 +1,1 @@
+Copied unchanged on 2026-10-11 from decoder's local scratch /home/claude/work/decoder/pr3/tests/, so that the tests cited in `notes/decoder/willow_prereg_r3.md` §8 survive a lost disk; they import and write local paths under /home/claude/work/decoder/ and do not run from here as they stand; md5s are in MD5SUMS, and `test_analyze.out` is the recorded output of `test_analyze.py`.

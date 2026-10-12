@@ -1,0 +1,15 @@
+{
+ "note": "MILP timing and certificate plan for mpe_milp.py (reservoir, 2026-10-10; item 3 of main's brief). Shots: the first n of the every-5th subset of each leaf (the same shots as mpe_timing_plan.json; at d = 5, r = 30 the 34 shots that Tesseract with decoder's settings decoded there). Tesseract tags as in mpe_timing_plan.json; inf_beam is not run at r = 30, where it hit its queue limit on 6 of 32 shots.",
+ "time_limit_s": 30,
+ "budget_cpu_s": 90,
+ "tesseract": {
+  "decoder":  {"kw": {"det_beam": 20, "beam_climbing": true, "no_revisit_dets": true, "pqlimit": 1000000, "num_det_orders": 20}},
+  "inf_beam": {"kw": {"det_beam": "INF", "beam_climbing": false, "no_revisit_dets": true, "pqlimit": 1000000, "num_det_orders": 1}}
+ },
+ "leaves": [
+  {"d": 3, "series": "q6_7/X", "r": 10, "n": 20, "tesseract": ["inf_beam"]},
+  {"d": 5, "series": "q6_5/Z", "r": 10, "n": 40, "tesseract": ["decoder", "inf_beam"]},
+  {"d": 5, "series": "q6_5/Z", "r": 30, "n": 34, "tesseract": ["decoder"]},
+  {"d": 5, "series": "q6_5/Z", "r": 50, "n": 8, "tesseract": []}
+ ]
+}

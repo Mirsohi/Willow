@@ -1,0 +1,17 @@
+{
+ "note": "Timing test plan for mpe.py (reservoir, 2026-10-10; item 3 of main's brief). CPU budgets are per Tesseract run and leaf; a run stops after the shot that crosses its budget. 'decoder' = decoder's Tesseract settings (code/decoder/baselines.py: det_beam 20, beam climbing, no revisits, pqlimit 1e6, 20 detector orders); 'inf_beam' = no detection-event beam, one order, revisits pruned; 'astar' = no beam, one order, revisits allowed (plain A*).",
+ "tesseract": {
+  "decoder":  {"kw": {"det_beam": 20, "beam_climbing": true, "no_revisit_dets": true, "pqlimit": 1000000, "num_det_orders": 20}, "budget_cpu_s": 25},
+  "inf_beam": {"kw": {"det_beam": "INF", "beam_climbing": false, "no_revisit_dets": true, "pqlimit": 1000000, "num_det_orders": 1}, "budget_cpu_s": 25},
+  "astar":    {"kw": {"det_beam": "INF", "beam_climbing": false, "no_revisit_dets": false, "pqlimit": 1000000, "num_det_orders": 1}, "budget_cpu_s": 25}
+ },
+ "d3": [
+  {"series": "q6_7/X", "r": 10, "n": 1000, "tesseract": ["decoder", "inf_beam", "astar"], "n_decoder": 400, "n_inf_beam": 400, "n_astar": 400},
+  {"series": "q6_7/X", "r": 30, "n": 1000, "tesseract": ["decoder", "inf_beam", "astar"], "n_decoder": 300, "n_inf_beam": 300, "n_astar": 300},
+  {"series": "q6_7/X", "r": 50, "n": 600, "tesseract": ["decoder", "inf_beam", "astar"], "n_decoder": 200, "n_inf_beam": 200, "n_astar": 200}
+ ],
+ "d5": [
+  {"series": "q6_5/Z", "r": 10, "n": 200, "tesseract": ["decoder", "inf_beam", "astar"], "n_decoder": 200, "n_inf_beam": 200, "n_astar": 200},
+  {"series": "q6_5/Z", "r": 30, "n": 100, "tesseract": ["decoder", "inf_beam"], "n_decoder": 100, "n_inf_beam": 100}
+ ]
+}
