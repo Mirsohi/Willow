@@ -23,6 +23,13 @@ Panel (c): PR3's post hoc r = 10 follow-up (willow_prereg_r3.md section 10, amen
   results/decoder/willow/pr3/r10_posthoc/analysis/r10_results.json, keys gaps[<decoder>][<d>]["g"] and ["ci95"];
   nothing is refitted here. One-round-count values with SPAM included: they compare across d at r = 10 only, not
   with panel (a) or (b).
+
+--r10only (added 2026-10-13 for manuscript v2.0, whose Fig. S1 it draws; the review of v1.1, point 3.3, moved the
+post hoc r = 10 point out of the main figures): a figure of its own, with nothing from round 1's W5 analysis.
+Panel (a): as --r10's panel (c). Panel (b): the growth factors g5/g3 and g7/g5 at r = 10 with their Fieller 95% CIs,
+  read from the same file, key growth[<decoder>]["g5/g3" | "g7/g5"]["ratio"] and ["ci95"], log axis, with the line of
+  no growth at 1 (Libra's g7/g5 interval includes 1). Descriptive; nothing is refitted here.
+Usage: python3 -I fig_willow_gaps.py <experimental-root>/ <out-prefix> --r10only  ->  <out-prefix>.{png,pdf}.
 """
 import json
 import math
@@ -48,6 +55,75 @@ plt.rcParams.update({"font.family": "sans-serif", "font.size": 8, "axes.edgecolo
                      "legend.frameon": False})
 ROWS = [("libra", "Libra"), ("tesseract", "Tesseract †"), ("harmony", "Harmony"), ("corrmatch", "corr. matching"),
         ("corr_mwpm", "corr. MWPM"), ("mwpm", "MWPM"), ("beliefmatch", "BeliefMatching")]
+
+if "--r10only" in sys.argv[3:]:
+    R10P = root + "results/decoder/willow/pr3/r10_posthoc/analysis/r10_results.json"
+    RR = json.load(open(R10P))
+    C_ROWS = [("libra.rl", "Libra"), ("harmony.rl", "Harmony"), ("harmony.si1000", "Harmony, SI1000"),
+              ("corrmatch.rl", "corr. matching"), ("corrmatch.si1000", "corr. matching, SI1000"),
+              ("corr_mwpm.rl", "corr. MWPM"), ("mwpm.rl", "MWPM")]
+    STY = {"3": dict(mfc=SURF, mec=SLOT[0], mew=1.3, ecolor=SLOT[0]),
+           "5": dict(mfc=SLOT[1], mec=SLOT[1], ecolor=SLOT[1]),
+           "7": dict(mfc=SLOT[2], mec=SLOT[2], ecolor=SLOT[2])}
+    fig, (cx, gx) = plt.subplots(1, 2, figsize=(7.2, 3.3), sharey=True, gridspec_kw={"width_ratios": [1.65, 1.0]})
+    nc = len(C_ROWS)
+    offc = 0.22
+    crows = []
+    for i, (k, lab) in enumerate(C_ROWS):
+        y = nc - 1 - i
+        G = RR["gaps"][k]
+        pts = [(d, G[d]["g"], G[d]["ci95"], G[d]["n_series"]) for d in ("3", "5", "7")]
+        ys = [y + offc, y, y - offc]
+        cx.plot([100 * p[1] for p in pts], ys, color=AXIS, lw=1.0, zorder=1)
+        for (d, g, ci, ns), yy in zip(pts, ys):
+            cx.errorbar(100 * g, yy, xerr=[[100 * (g - ci[0])], [100 * (ci[1] - g)]], fmt="o", ms=4.0,
+                        elinewidth=1.1, capsize=0, zorder=3, **STY[d])
+        gr = RR["growth"][k]
+        for (rk, col, yy) in (("g5/g3", SLOT[1], y + 0.13), ("g7/g5", SLOT[2], y - 0.13)):
+            rv, (lo, hi) = gr[rk]["ratio"], gr[rk]["ci95"]
+            gx.errorbar(rv, yy, xerr=[[rv - lo], [hi - rv]], fmt="o", ms=4.0, mfc=col, mec=col, ecolor=col,
+                        elinewidth=1.1, capsize=0, zorder=3)
+        crows.append((lab, pts, gr))
+    lg = RR["growth"]["libra.rl"]["g7/g5"]
+    gx.annotate("%.2f [%.2f, %.2f]" % (lg["ratio"], *lg["ci95"]), (lg["ci95"][1], nc - 1 - 0.13), xytext=(4, 0),
+                textcoords="offset points", va="center", ha="left", fontsize=6.5, color=INK2)
+    cx.set_xscale("log")
+    cx.set_xlim(0.8, 200)
+    cx.set_xticks([1, 2, 5, 10, 20, 50, 100, 200])
+    cx.set_xticklabels(["1", "2", "5", "10", "20", "50", "100", "200"])
+    cx.set_yticks(range(nc))
+    cx.set_yticklabels([lab for _, lab in C_ROWS][::-1], color=INK)
+    cx.set_ylim(-0.6, nc - 0.4)
+    cx.set_xlabel("gap to ML(RL) at r = 10, SPAM included, % (95% CI)")
+    cx.grid(axis="y", visible=False)
+    cx.plot([], [], "o", ms=4.0, mfc=SURF, mec=SLOT[0], mew=1.3, label="d = 3 (18 leaves)")
+    cx.plot([], [], "o", ms=4.0, mfc=SLOT[1], mec=SLOT[1], label="d = 5 (7 leaves; rule A)")
+    cx.plot([], [], "o", ms=4.0, mfc=SLOT[2], mec=SLOT[2], label="d = 7 (2 leaves: X and Z)")
+    cx.legend(loc="upper right", fontsize=6.5, handletextpad=0.3)
+    cx.set_title("(a) post hoc, descriptive: gaps at r = 10 only", loc="left", fontsize=8, color=INK)
+    gx.axvline(1.0, color=MUTED, lw=0.9, ls="--", zorder=1)
+    gx.set_xscale("log")
+    gx.set_xlim(0.4, 12)
+    gx.set_xticks([0.5, 1, 2, 5, 10])
+    gx.set_xticklabels(["0.5", "1", "2", "5", "10"])
+    gx.minorticks_off()
+    gx.tick_params(labelleft=False)
+    gx.set_xlabel("growth factor (Fieller 95% CI)")
+    gx.grid(axis="y", visible=False)
+    gx.plot([], [], "o", ms=4.0, mfc=SLOT[1], mec=SLOT[1], label="g₅/g₃")
+    gx.plot([], [], "o", ms=4.0, mfc=SLOT[2], mec=SLOT[2], label="g₇/g₅")
+    gx.legend(loc="lower right", fontsize=6.5, handletextpad=0.3)
+    gx.set_title("(b) growth factors; dashed: no growth", loc="left", fontsize=8, color=INK)
+    fig.tight_layout(w_pad=1.6)
+    fig.savefig(prefix + ".png", dpi=220)
+    fig.savefig(prefix + ".pdf", metadata={"CreationDate": None})
+    print("source", R10P.replace(root, ""), RR["made"], "all_checks_ok", RR["all_checks_ok"])
+    for lab, pts, gr in crows:
+        print("%-23s" % lab + "  ".join("g%s %7.2f%% [%6.2f, %6.2f] (%d)" % (d, 100 * g, 100 * ci[0], 100 * ci[1], ns)
+                                         for d, g, ci, ns in pts),
+              "  g5/g3 %.2f [%.2f, %.2f]  g7/g5 %.2f [%.2f, %.2f]" % (
+                  gr["g5/g3"]["ratio"], *gr["g5/g3"]["ci95"], gr["g7/g5"]["ratio"], *gr["g7/g5"]["ci95"]))
+    sys.exit(0)
 
 
 def entry(d, a):

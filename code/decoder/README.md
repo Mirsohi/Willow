@@ -154,6 +154,28 @@ copies in `results/decoder/willow/pr3_planning/`.
   (zipfile, read only); Libra's eps7 against Table S1; the expected precision of g_7 on expected 2x2 tables.
 - `pr3_power.py`: the Birge inflation at d = 5, and power and cost of the PR3 designs.
 
+**Revision after the 13 October review** (`revision/`). These are post hoc revision analyses, not pre-registered tests.
+
+- Plan: `notes/orchestrator/willow_revision_plan.md`. Declarations: `notes/decoder/willow_revision_declarations.md`.
+- The scripts only read the archive and the decode outputs.
+- Run with `nice python3 -I -B`, one thread; arguments are in each docstring.
+- Outputs go to `results/decoder/willow/revision/`.
+
+Scripts:
+
+- `rev_inputs_check.py`: input check after a container restart. It covers:
+  - the local zip against `MANIFEST.json`;
+  - the CRC-32 of every extracted file of the 24 d = 5 leaves at r = 10, 30, 50;
+  - the md5 links between the ladder outputs, K2, the non-band check and round 1's final analysis.
+- `rev_d3_facts.py` (D3): two censuses.
+  - Fault merging in every DEM decoded, with Tesseract's own merge as a check.
+  - The sparse decoder's retained-state cap at d = 5.
+- `rev_d4_table13.py` (D4): Table 13's gaps, with the frozen-formula SEs and the corrected SEs (entry 7).
+- `rev_d2_worstcase.py` (D2): rebuilds every row of the non-band check's `nonband_results.json` with its own code, and
+  checks g_5 against the frozen estimator. It then states the strata, weights and bounds behind the 95% worst cases,
+  and finds the extremes of the count gap and of g_5 over the rates the bounds allow (pooled rates, and per round
+  count as a sensitivity).
+
 **Stages and cost** (`python3 -I -B willow_stage.py estimate`; the layout the fetch session read from the zip's central
 directory: 9 / 4 / 1 patches at d = 3 / 5 / 7, X and Z, 15 round counts 1, 10, 13, 30, 50, 70, ..., 250, 50,000 shots per
 folder, no Libra at r = 1 and 13; CPU unit costs below). The plan made from the real inventory prints the same table for

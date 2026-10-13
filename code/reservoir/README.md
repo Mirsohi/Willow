@@ -427,3 +427,22 @@ Design: `notes/reservoir/sim_design.md` (approved by main at 22:48Z as stages A 
 | `sim_plan.json` (scratch; copied to results) | 07968771a7295e4e29057663e517186c |
 | `check_resume.py` | 1ccc1bb8ea17ef37f305d72de01a994a (11 Oct, before the resume) |
 | `run_sim.sh` (scratch) | e608fdd46aedb27618d412054e6b8655 (from the resume, nice 10; e92c110e… before) |
+
+## Willow revision after the 13 October review (`willow_revision/`, 13 October 2026; POST HOC)
+
+These are main's tasks R1–R5 of `notes/orchestrator/willow_revision_plan.md`. They are post hoc revision analyses,
+not pre-registered tests. Each compute task is declared in `notes/reservoir/willow_revision_declarations.md` before any
+of its results is read. Run every script with `python3 -I -B`, at nice 10 with one thread
+(`/home/claude/work/reservoir/revision/runjob.sh`); set `NUMBA_CACHE_DIR` to a scratch folder. Outputs go through
+`qrc/outpaths.py` to `results/reservoir/willow_revision/`.
+
+| file | task | what it does | md5 |
+|---|---|---|---|
+| `check_inputs.py` | all | integrity of the local inputs after the 15:07Z restart: the archive extract against the zip by CRC, the simulation against its md5 records, scratch copies against the store; read-only | 7575a21e0c88595055d122a4ea5ba1c7 |
+| `r3_patch.py` | R3 (1.5) | patch-level sensitivity of the final analysis (per-patch d = 5 gaps; leave one patch or region out; intervals with series and patches as clusters; patch jackknife; X/Z correlation within patches) and Table 7's paired Λ ratio against separately fitted Λs (leaf-cell bootstrap, B = 10,000); reproduces `gap_table.json` and scout's series-clustered GRF | 55ed7c18f6576d84bc338ea938bca59e |
+| `mpe_sparse.py` | R2 (1.4) | max-product twin of decoder's sparse-frontier contraction (`code/decoder/ml_sparse.py`, imported read-only): mode 0 is decoder's sum-product, bit for bit; mode 1 takes the maximum over the fault sets of a class (the MPE under the same pruning) | 6a6aa029c18be30bcd00c7abe5f93395 |
+| `r2_semiring.py` | R2 | runs decoder's τ ladder (1e-6 → 1e-8, band 0.1, cap 2,000,000) in either mode on the stored ML shots; pre-test (bitwise check against the stored ladder; exact MPE and ML at d = 3); chunked checkpoints; reads no outcome | bed6331cf4625246aa9778232989d763 |
+| `r1_certify.py` | R1 (1.4) | extends stage 2's integer-programming certificate of the stored Tesseract at d = 5 (plan: default_rng(20261013), equal per leaf, phase 1 to u ≤ D/2 at r = 10, 13, 30; phase 2 to u ≤ D/4 at r = 30); `resolve` settles R2's disagreements with the proven MPE; imports `willow_gapmech/exact_run.py` unchanged | 775fa211a4e7f8c969de99f02b8f4d40 |
+| `r12_analysis.py` | R1, R2 | R1's certificate with its worst case; R2's controlled degeneracy factor, Libra's share (window stated), shot-level concordance of Libra's and the MPE's failures (with other decoders as a reference), and the ladder checks | 85abb09c961ccac8fd3c0b164a428221 |
+| `r4_syndrome_fit.py` | R4 (1.6) | S-hat: decoder's F1 fit (`code/decoder/round2/run_f1.py`, imported read-only) with the syndrome log-likelihood as the only change of objective; same classes, pooling, optimizer, fit and held-out shots | 6532e200c24abf48d2cd42aaa39b330a |
+| `r4_analysis.py` | R4 | the matched comparison of D-hat and S-hat on the held-out halves, with decoder's round-2 definitions (reproduces `f1_analysis.json` for D-hat exactly) | 1132f591d01c19f74b3b6ea1e690129d |
