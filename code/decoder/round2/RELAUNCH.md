@@ -1,14 +1,15 @@
 # Round 2: relaunch after a container restart (decoder)
 
-For @main. Updated 2026-10-13 03:41Z by decoder. The queue finished at 19:06:16Z, so there is no queue to restart.
+For @main. Updated 2026-10-13 04:50Z by decoder. The queue finished at 19:06:16Z, so there is no queue to restart.
 After a restart, run every block under **Active now** except those marked "skip on a restart", and nothing else.
 
-**Status at 03:41Z on 2026-10-13: the r = 10 follow-up's τ4 rung (§2.10) runs. A restart relaunches §2.10 only.**
-Every other block under **Active now** is marked "skip on a restart".
-- §2.10 runs τ4 = 1e-9 on X/r10 and Z/r10, which still fail after τ3 (`willow_prereg_r3.md` §10a and §10b).
-  The 13 core-hour cap covers §2.9 and §2.10 together.
-- §2.9's driver exited 0 at 03:40:35Z: X/r10 and Z/r10 both still fail after τ3 (rule 2′).
-  It used 6.57 core-hours. Do not relaunch it.
+**Status at 04:50Z on 2026-10-13: nothing of decoder's is running, and a restart relaunches nothing.** Every block
+under **Active now** is marked "skip on a restart".
+- The r = 10 follow-up has finished: the driver exited 0 at 03:40:35Z (6.57 core-hours) and τ4 exited 0 at
+  04:34:27Z (3.08 core-hours): 9.65 of the 13 core-hour cap. X/r10 and Z/r10 both pass at the τ4 rung. The declared
+  analysis ran once, 04:41:56–04:43:07Z: exit 0, 62 of 62 checks pass. The two ledgers and the driver's and τ4's
+  logs were copied to `r10_posthoc/logs/` at 04:50Z; the part logs stay in `$P/logs/parts/` and `$P/logs/tau4/`.
+  `r10_posthoc/MD5SUMS` is skipped (main). Results: `results/decoder/willow/pr3/r10_posthoc/`.
 - PR3's runner (§2.4) exited 0 at 15:46:02Z: d = 7 ML was killed, because X/r50 and Z/r50 still fail after the
   extra rung (`results/decoder/willow/pr3/main/pr3_tally.json`, md5 1fae8f45…). It used 82.85 core-hours against
   its 116.8 guard. Do not relaunch it.
@@ -410,10 +411,10 @@ setsid nohup python3 -I -B $X/code/decoder/pr3/pr3_r10_posthoc.py --root $D/extr
   - 6: the projection passed the 13 core-hour guard. Do not relaunch; decoder reports to main;
   - 7: a part hit the memory cap.
 
-### 2.10 The r = 10 follow-up's τ4 rung (`notes/decoder/willow_prereg_r3.md` §10a and §10b), up to 4 working processes: started at about 03:41Z on 13 Oct
+### 2.10 The r = 10 follow-up's τ4 rung (`notes/decoder/willow_prereg_r3.md` §10a and §10b), up to 4 working processes: started at about 03:41Z, finished at 04:34:27Z on 13 Oct
 
-**Run this block on a restart.** First run the check in §1: if `pr3_r10_tau4.py` is still alive, do not start a
-second copy. §2.9's driver must have exited.
+**Skip on a restart.** τ4 exited 0 at 04:34:27Z (all tau4 parts done). A relaunch would start no part, but it
+would rewrite `r10_tau4_tally.json`, whose md5 the results cite.
 
 ```
 X=/mnt/project-files/tensor-networks/deep-dives/experimental
@@ -511,6 +512,8 @@ Not active yet. Decoder adds each stage's block under "Active now" before the st
 | 2026-10-12 16:07Z | Decoder ended the drain helper (SIGTERM at 15:53Z; it never wrote a pause) and stopped the shipper with its STOP file (exit at 15:58:39Z, after the final runner log and ledger were shipped at 15:48:38Z; the shared copy of its own log lacks only its last line). The leaf table written by `pr3_leaf_table.py` (md5 a3f2d7b1…) to `results/decoder/willow/pr3/leaf_table/`. §2.4, §2.7 and §2.8 marked "skip on a restart": a restart relaunches nothing. |
 | 2026-10-13 01:42Z | After the container restart of about 00:36Z, nothing needed relaunching (main). Kourosh chose the r = 10 runs at 00:58:22Z. `willow_prereg_r3.md` §10 logged at 01:41Z, before any part started. Block §2.9 added, and the r = 10 driver started (guard 13 core-hours). |
 | 2026-10-13 03:41Z | The r = 10 driver exited 0 at 03:40:35Z, after 6.57 core-hours. X/r10 and Z/r10 both still fail after τ3 (rule 2′). Under `willow_prereg_r3.md` §10a, τ4 runs on both: the projection is 11.12 core-hours against the cap of 13. §2.9 marked finished. Block §2.10 added, and τ4 started. |
+| 2026-10-13 04:44Z | τ4 exited 0 at 04:34:27Z, after 3.08 core-hours (total 9.65 of 13). X/r10 and Z/r10 both pass at the τ4 rung. The declared analysis ran once (exit 0, 62 of 62 checks). §2.10 marked finished; a restart relaunches nothing. |
+| 2026-10-13 04:50Z | The two ledgers and the driver's and τ4's logs copied to `r10_posthoc/logs/` (main's word); `r10_posthoc/MD5SUMS` skipped (main). |
 
 ### PR3 stage 0, the pilot (`notes/decoder/willow_prereg_r3.md` §8): finished at 20:35Z (design 25,000; guard 116.8 core-hours)
 
