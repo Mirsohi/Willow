@@ -1,10 +1,12 @@
 # Round 2: relaunch after a container restart (decoder)
 
-For @main. Updated 2026-10-12 16:07Z by decoder. The queue finished at 19:06:16Z, so there is no queue to restart.
+For @main. Updated 2026-10-13 01:42Z by decoder. The queue finished at 19:06:16Z, so there is no queue to restart.
 After a restart, run every block under **Active now** except those marked "skip on a restart", and nothing else.
 
-**Status at 16:07Z on 2026-10-12: nothing of decoder's is running, and a restart relaunches nothing.** Every block
-under **Active now** is marked "skip on a restart".
+**Status at 01:42Z on 2026-10-13: PR3's post hoc r = 10 follow-up (§2.9) runs. A restart relaunches §2.9 only.**
+Every other block under **Active now** is marked "skip on a restart".
+- §2.9 decodes X/r10 and Z/r10 of d7_at_q6_7 with PR3's design and rules, by Kourosh's choice of 00:58:22Z
+  (`willow_prereg_r3.md` §10). Its cap is 13 core-hours. PR3's kill stands.
 - PR3's runner (§2.4) exited 0 at 15:46:02Z: d = 7 ML was killed, because X/r50 and Z/r50 still fail after the
   extra rung (`results/decoder/willow/pr3/main/pr3_tally.json`, md5 1fae8f45…). It used 82.85 core-hours against
   its 116.8 guard. Do not relaunch it.
@@ -363,6 +365,49 @@ cycle and exits. A leftover `logship.lock` does no harm: the lock is an flock, r
 - `tail -n 2 /home/claude/work/decoder/ship/logship.out`: one line per cycle.
 - The copies and their md5s: `results/decoder/willow/live_logs/SHIPPED.json`.
 
+### 2.9 PR3's post hoc r = 10 follow-up (`notes/decoder/willow_prereg_r3.md` §10), up to 4 working processes: started at about 01:42Z on 13 Oct
+
+**Run this block on a restart.** First run the check in §1: if `pr3_r10_posthoc.py` is still alive, do not start a
+second copy.
+
+```
+X=/mnt/project-files/tensor-networks/deep-dives/experimental
+P=/home/claude/work/decoder/pr3_r10
+D=/home/claude/work/decoder/pr3_data
+mkdir -p $P/logs/parts $P/work $P/state
+cd $P
+NUMBA_CACHE_DIR=/home/claude/work/decoder/pr3/numba_cache OMP_NUM_THREADS=1 NUMBA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+setsid nohup python3 -I -B $X/code/decoder/pr3/pr3_r10_posthoc.py --root $D/extract \
+  --res $X/results/decoder/willow/pr3/r10_posthoc --work $P/work --state $P/state --logs $P/logs/parts \
+  --pilot $X/results/decoder/willow/pr3/pilot/pilot.json --design 25k --guard-core-hours 13 \
+  >> $P/logs/pr3_r10_posthoc.out 2>&1 < /dev/null &
+```
+
+**How it runs**
+- `pr3_r10_posthoc.py` (md5 f6e263ca…) runs PR3's runner class (`pr3_runner.py`, md5 4bd2a21a…, unchanged) on the
+  two r = 10 leaves only. It sets `pr3_common.ROUNDS = (10,)` in its own process.
+- Units: 10 ladder parts (the frozen `decode_willow.py`), then 5 extra parts (`pr3_extra_rung.py`) for a leaf that
+  fails its ladder rules. Shots, decoders, rules and the extra rung are PR3's (§2.4).
+- It holds no slot and has no kill rule. It keeps the heavy processes on the machine at 4 at most. A part starts only
+  if 3 GiB of memory stays free, and each part runs under a 4 GiB cap.
+- The guard is 13 core-hours. The projection at the start was 7.2 core-hours (estimate).
+- `$P/state/control.json` with `{"pause": true}` stops new parts from starting. Remove the key to resume.
+- No drain helper and no log shipper. Decoder copies the logs and the ledger to `r10_posthoc/logs/` at the end.
+
+**How it resumes**
+- Run the block again. Finished parts are found from their outputs, and ladder chunks in `$P/work` resume.
+- A part still running from an earlier driver keeps its slot and is not started twice.
+- If `$D/extract` is missing, re-create it as in §2.4.
+
+**Checking on it**
+- `tail -n 5 $P/logs/pr3_r10_posthoc.out` (a status line every 30 minutes).
+- `results/decoder/willow/pr3/r10_posthoc/r10_tally.json`: the two verdicts and the projection.
+- **Exit statuses:**
+  - 0: all parts done (see `r10_tally.json`);
+  - 5: a part failed;
+  - 6: the projection passed the 13 core-hour guard. Do not relaunch; decoder reports to main;
+  - 7: a part hit the memory cap.
+
 ## 3. Later stages
 
 Not active yet. Decoder adds each stage's block under "Active now" before the stage starts:
@@ -419,6 +464,7 @@ Not active yet. Decoder adds each stage's block under "Active now" before the st
 | 2026-10-12 01:52Z | Relaunched after checks (PR3's extracts against their manifest, the 4 parts' chunks and specs, PR3's shared outputs and `live_logs`: all intact, no temporary files). PR3's runner at 01:47:38Z (pid 448) resumed its 4 parts from their chunks; the shipper started at 01:48:36Z (pid 515); the drain at 01:50:31Z (pid 603), with its times moved to this container (deadline 01:15Z on 13 Oct): pause time 22:50:11Z. |
 | 2026-10-12 15:46:02Z | PR3's runner exited 0: d = 7 ML killed, since X/r50 and Z/r50 still fail after the extra rung (`pr3_tally.json`, md5 1fae8f45…). 82.85 core-hours used against the 116.8 guard. X/r10 and Z/r10 had run no part; X/r30 and Z/r30 had 3 and 1 of their 5 extra parts done. |
 | 2026-10-12 16:07Z | Decoder ended the drain helper (SIGTERM at 15:53Z; it never wrote a pause) and stopped the shipper with its STOP file (exit at 15:58:39Z, after the final runner log and ledger were shipped at 15:48:38Z; the shared copy of its own log lacks only its last line). The leaf table written by `pr3_leaf_table.py` (md5 a3f2d7b1…) to `results/decoder/willow/pr3/leaf_table/`. §2.4, §2.7 and §2.8 marked "skip on a restart": a restart relaunches nothing. |
+| 2026-10-13 01:42Z | After the container restart of about 00:36Z, nothing needed relaunching (main). Kourosh chose the r = 10 runs at 00:58:22Z. `willow_prereg_r3.md` §10 logged at 01:41Z, before any part started. Block §2.9 added, and the r = 10 driver started (guard 13 core-hours). |
 
 ### PR3 stage 0, the pilot (`notes/decoder/willow_prereg_r3.md` §8): finished at 20:35Z (design 25,000; guard 116.8 core-hours)
 

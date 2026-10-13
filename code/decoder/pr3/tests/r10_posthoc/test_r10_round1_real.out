@@ -1,0 +1,27 @@
+ok   r = 30: 226 leaf x decoder checks against the final analysis, 0 failed []
+ok   r = 30: nothing missing ([]), no load problem ([])
+ok   r = 30: rule A excludes 1 leaves: ['d5_at_q6_5/X/r30']
+ok   r = 30, libra.rl: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30, harmony.rl: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30, harmony.si1000: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30, corrmatch.rl: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30, corrmatch.si1000: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30, corr_mwpm.rl: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30, mwpm.rl: series d = 3 18 (want 18), d = 5 7 (want 7)
+ok   r = 30: marginals ML d5 7, Libra d5 8, d3 18/18
+ok   r = 30, d = 3: g_and_se's frozen formula equals pool_gap() on 18 one-round series
+ok   r = 30, d = 5: g_and_se's frozen formula equals pool_gap() on 7 one-round series
+ok   r = 50: 210 leaf x decoder checks against the final analysis, 0 failed []
+ok   r = 50: nothing missing ([]), no load problem ([])
+ok   r = 50: rule A excludes 3 leaves: ['d5_at_q4_7/X/r50', 'd5_at_q6_5/X/r50', 'd5_at_q6_9/Z/r50']
+ok   r = 50, libra.rl: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50, harmony.rl: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50, harmony.si1000: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50, corrmatch.rl: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50, corrmatch.si1000: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50, corr_mwpm.rl: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50, mwpm.rl: series d = 3 18 (want 18), d = 5 5 (want 5)
+ok   r = 50: marginals ML d5 5, Libra d5 8, d3 18/18
+ok   r = 50, d = 3: g_and_se's frozen formula equals pool_gap() on 18 one-round series
+ok   r = 50, d = 5: g_and_se's frozen formula equals pool_gap() on 5 one-round series
+26 of 26 checks pass
