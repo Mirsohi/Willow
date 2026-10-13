@@ -198,6 +198,21 @@ Scripts:
   - `a1_alloc.py`: the cheapest added sample in those cells for a given lower limit, and named designs.
   - `a1_width.py`: the frontier width of the exact sweep at d = 5, with its memory and work per shot.
   - `a1_ctg_path.py`: a cotengra tree search with `ml_cotengra.py`'s own settings (path only, no contraction).
+- `a1r2_select.py`, `a1r2_analyze.py` (A1-R2, route 2 of the A1 assessment): the targeted sample for the per-round
+  limits of g_5. Declared in A1-R2 of the declarations file. The decoding is `rev_d1_run.py`'s.
+  - `a1r2_select.py`: in `sample` mode it draws the sample, in `rev_d1_run.py`'s selection format. The sample is a
+    census of r = 10 C11, and r = 30 C00 and r = 50 C00 extended by random shots. In `mps` mode, after the sparse
+    run, it orders the MPS subsample: the changed shots and the pre-drawn random ones.
+  - `a1r2_analyze.py`: the per-round box of R5 with the new shots (censuses exact, other cells bounded), the
+    declared outcome, the MPS comparison and the sensitivity readings.
+  - `a1r2_project.py` (A1-R2-P): a planning projection, not a result, and not for the paper. It reads no new
+    decoding. It first reproduces `a1r2_results.json`'s primary numbers. It then recomputes the box with
+    r = 30 C00 set to the design's 1,556 shots, under assumed flip counts.
+- `rev_d1_labels.py` (D1-5b, D1-5c): the declared reporting labels of D1's result. It replays `rev_d1_analyze.py` on
+  the same inputs and seeds, and stops unless the replay reproduces `d1_results.json`. It records each posterior
+  draw's count gap and its shot-noise SE. It then labels the result per cell and under the pooled reading, for rules
+  A and none (contradiction first; then partial, disagreement, agreement or inconclusive). It also gives the
+  per-stratum agreement with exact 95% bounds.
 
 **Stages and cost** (`python3 -I -B willow_stage.py estimate`; the layout the fetch session read from the zip's central
 directory: 9 / 4 / 1 patches at d = 3 / 5 / 7, X and Z, 15 round counts 1, 10, 13, 30, 50, 70, ..., 250, 50,000 shots per
