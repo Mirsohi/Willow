@@ -4,22 +4,28 @@ Post hoc revision analysis. Reads only the selected shots' detection events (rev
 name (md5 checked); it never reads a stored decision or an observed outcome. One thread; resumable.
 
   mps     boundary MPS (ml_mps_fast.FastMPSDecoder, reweighted, cutoff 1e-14, the frozen module) on a chi ladder. Per shot
-          the ladder runs --chis in order and stops after rung k >= 1 when
-              the decision equals rung k-1's and |P_k - P_(k-1)| <= --stop-frac x |P_k - 1/2|   (status "resolved"),
-          or when |P_k - P_(k-1)| < 1e-4, or at the top chi (status "unresolved" unless the first condition holds).
-          With --all-chis every rung runs (the timing probe).
+          the ladder runs --chis in order. After rung k >= 1 the stop rule FIRES when
+              the decision equals rung k-1's and |P_k - P_(k-1)| <= --stop-frac x |P_k - 1/2|   ("resolved"),
+              or |P_k - P_(k-1)| < 1e-4.
+          The ladder stops at the first rung where the rule fires, or at the top chi. Audit rows (every --audit-every-th
+          row of each worker's queue: floor(order / workers) mod --audit-every == 0) run at least --audit-min-rungs
+          rungs and then stop where the rule fires again;
+          each line records the rung where the rule first fired and the decision there. With --all-chis every rung
+          runs (the timing probe).
   sparse  the frozen sparse-frontier decoder, rebuilt as decode_willow builds the ladder (tau1 = 1e-6, kmax =
-          KMAX_LADDER, deeper rungs sharing tau1's compiled program), at every (name, tau, kmax) of --sparse-runs.
+          KMAX_LADDER, deeper rungs sharing tau1's compiled program), at every (name, tau, kmax) of --sparse-runs,
+          except the runs that --sparse-skip lists for the row's stratum (for example "B:t3;C_high:t2_k25000,t3").
 Each worker takes the rows with worker == --worker (sample) or row mod --workers (probe), in processing order, and
 appends one JSON line per shot to <out>/<mode>_w<k>.jsonl (flushed and fsynced). A restart skips the rows already there.
-CPU guard: before a shot, this worker's CPU so far (all runs, from <out>/<mode>_w<k>.state.json) plus the shot's
-projected CPU (--proj-s-per-round x rounds) must stay within --cpu-cap-hours; otherwise it writes status "stopped: cpu
-cap" and exits 3. Exit 0 when every row of the worker is done.
+Guards, checked before each shot: this worker's CPU so far (all runs; see base_cpu) plus the shot's projected CPU
+(--proj-s-per-round x rounds) must stay within --cpu-cap-hours, and the UTC time must be before --deadline (if given);
+otherwise the worker writes status "stopped: cpu cap" or "stopped: deadline" and exits 3. Exit 0 when every row of the
+worker is done.
   NUMBA_CACHE_DIR=<scratch> OMP_NUM_THREADS=1 NUMBA_NUM_THREADS=1 nice -n 10 python3 -I -B rev_d1_run.py mps \
       --root <extract> --sel <dir> [--probe] --out <dir> --worker 0 --workers 2 --cpu-cap-hours H --chis 8,16,32,64 \
-      --stop-frac 0.5 --proj-s-per-round S
+      --stop-frac 0.5 --proj-s-per-round S [--audit-every 10 --audit-min-rungs 3] [--deadline 2026-10-14T10:00:00Z]
 """
-import argparse, hashlib, json, math, os, sys, time
+import argparse, calendar, hashlib, json, math, os, sys, time
 
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,6 +39,7 @@ from ml_sparse import SparseFrontierDecoder                        # frozen; rea
 from decode_willow import KMAX_LADDER, _ml_out                     # frozen; read-only
 
 T1 = 1e-6
+STRATA = ("B", "D", "C_low", "C_high")                              # the stratum codes of rev_d1_select.py
 
 
 def md5(p):
@@ -59,6 +66,15 @@ def write_json(path, obj):
     os.replace(tmp, path)
 
 
+def fires(p1, p0, stop_frac):
+    """The stop rule between two consecutive rungs: (fires, resolved)."""
+    if not (math.isfinite(p1) and math.isfinite(p0)):
+        return False, False
+    dp = abs(p1 - p0)
+    resolved = ((p1 > 0.5) == (p0 > 0.5)) and dp <= stop_frac * abs(p1 - 0.5)
+    return bool(resolved or dp < 1e-4), bool(resolved)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=("mps", "sparse"))
@@ -69,13 +85,18 @@ def main():
     ap.add_argument("--worker", type=int, required=True)
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--cpu-cap-hours", type=float, required=True)
+    ap.add_argument("--deadline", default=None, help="UTC, e.g. 2026-10-14T10:00:00Z")
     ap.add_argument("--chis", default="8,16,32,64")
     ap.add_argument("--stop-frac", type=float, default=0.5)
     ap.add_argument("--all-chis", action="store_true")
+    ap.add_argument("--audit-every", type=int, default=0)
+    ap.add_argument("--audit-min-rungs", type=int, default=3)
     ap.add_argument("--sparse-runs", default="t1:1e-6:2000000,t2:1e-8:2000000,t2_k25000:1e-8:25000,t2_k6250:1e-8:6250,"
                                              "t3:1e-9:2000000")
+    ap.add_argument("--sparse-skip", default="")
     ap.add_argument("--proj-s-per-round", type=float, required=True)
     a = ap.parse_args()
+    deadline = calendar.timegm(time.strptime(a.deadline, "%Y-%m-%dT%H:%M:%SZ")) if a.deadline else None
     name = "probe" if a.probe else "sample"
     meta = json.load(open(os.path.join(a.sel, name + ".json")))
     zp = os.path.join(a.sel, name + ".npz")
@@ -85,11 +106,11 @@ def main():
     n = len(lid)
     if a.probe:
         mine = [i for i in range(n) if i % a.workers == a.worker]
-        leaves = meta["leaves"]
+        order = np.arange(n); strat = np.full(n, -1)
     else:
-        order = Z["order"]; wk = Z["worker"]
+        order = Z["order"]; wk = Z["worker"]; strat = Z["stratum"]
         mine = [int(i) for i in np.argsort(order) if wk[i] == a.worker]
-        leaves = meta["leaves"]
+    leaves = meta["leaves"]
     os.makedirs(a.out, exist_ok=True)
     tag = f"{a.mode}{'_probe' if a.probe else ''}_w{a.worker}"
     lines_p = os.path.join(a.out, tag + ".jsonl"); state_p = os.path.join(a.out, tag + ".state.json")
@@ -117,6 +138,12 @@ def main():
     for item in a.sparse_runs.split(","):
         nm, tau, km = item.split(":")
         sruns.append((nm, float(tau), int(km)))
+    skip = {}
+    for item in filter(None, a.sparse_skip.split(";")):
+        s_, lst = item.split(":")
+        assert s_ in STRATA, s_
+        skip[STRATA.index(s_)] = set(lst.split(","))
+        assert skip[STRATA.index(s_)] <= {nm for nm, _, _ in sruns}, item
     decs = {}
 
     def build(k):
@@ -154,34 +181,40 @@ def main():
         if used + a.proj_s_per_round * r > cap_s:
             status = "stopped: cpu cap"
             break
+        if deadline is not None and time.time() >= deadline:
+            status = "stopped: deadline"
+            break
         D, nd, build_s = build(int(lid[i]))
         assert int(ndet[i]) == nd, "detector count differs from the DEM"
         syn = np.ascontiguousarray(det[i:i + 1, :nd])
         rec = {"row": int(i), "leaf_id": int(lid[i]), "rounds": r, "build_cpu_s": build_s}
         if a.mode == "mps":
+            audit = (not a.probe) and a.audit_every > 0 and (int(order[i]) // a.workers) % a.audit_every == 0
+            min_j = (a.audit_min_rungs - 1) if audit else 1
             P, LP, MB, CPU, CH = [], [], [], [], []
-            resolved = False
+            resolved, first_fire = False, None
             for j, chi in enumerate(chis):
                 D.chi = chi
                 c0 = time.process_time()
                 post, logp = D.class_probs(syn)
                 CPU.append(time.process_time() - c0)
                 p1 = float(post[0, 1]); P.append(p1); LP.append(float(logp[0])); MB.append(int(D.last_maxbond[0])); CH.append(chi)
-                if j >= 1 and not a.all_chis:
-                    p0 = P[-2]
-                    if math.isfinite(p1) and math.isfinite(p0):
-                        d1, d0 = p1 > 0.5, p0 > 0.5
-                        dp = abs(p1 - p0)
-                        resolved = (d1 == d0) and dp <= a.stop_frac * abs(p1 - 0.5)
-                        if resolved or dp < 1e-4:
-                            break
-            if a.all_chis and len(P) >= 2 and math.isfinite(P[-1]) and math.isfinite(P[-2]):
-                resolved = ((P[-1] > 0.5) == (P[-2] > 0.5)) and abs(P[-1] - P[-2]) <= a.stop_frac * abs(P[-1] - 0.5)
-            rec.update(chis=CH, P1=P, logp=LP, maxbond=MB, cpu_s=CPU, resolved=bool(resolved),
+                if j >= 1:
+                    f, resolved = fires(P[-1], P[-2], a.stop_frac)
+                    if f and first_fire is None:
+                        first_fire = j
+                    if f and j >= min_j and not a.all_chis:
+                        break
+            rec.update(chis=CH, P1=P, logp=LP, maxbond=MB, cpu_s=CPU, resolved=bool(resolved), audit=bool(audit),
+                       first_fire=first_fire,
+                       pred_first_fire=None if first_fire is None else int(np.nan_to_num(P[first_fire], nan=0.0) > 0.5),
                        pred=int(np.nan_to_num(P[-1], nan=0.0) > 0.5))
         else:
             out = {}
+            sk = skip.get(int(strat[i]), set())
             for nm, tau, km in sruns:
+                if nm in sk:
+                    continue
                 c0 = time.process_time()
                 post, logp = D[nm].class_probs(syn)
                 sec = time.process_time() - c0

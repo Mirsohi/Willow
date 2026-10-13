@@ -175,6 +175,15 @@ Scripts:
   checks g_5 against the frozen estimator. It then states the strata, weights and bounds behind the 95% worst cases,
   and finds the extremes of the count gap and of g_5 over the rates the bounds allow (pooled rates, and per round
   count as a sensitivity).
+- `rev_d1_select.py`, `rev_d1_run.py`, `rev_d1_analyze.py` (D1): the boundary-MPS check of the d = 5 ML(RL)
+  reference. Declared in D1-0, D1-1 and D1-2 of the declarations file.
+  - `rev_d1_select.py` draws a stratified random sample of shots: the band, the discordant shots, and the
+    low- and high-confidence concordant shots, at each round count. It writes only their detection events.
+  - `rev_d1_run.py` decodes them, resumably, with checkpoints and a CPU guard. In `mps` mode it runs boundary
+    MPS on a chi ladder with a stop rule and an audit. In `sparse` mode it runs the sparse ladder, with
+    lowered caps as a test.
+  - `rev_d1_analyze.py` compares the decodes with the paper's decisions and the census decisions. It derives
+    the implied count gap and g_5: estimates, posterior intervals and worst cases.
 
 **Stages and cost** (`python3 -I -B willow_stage.py estimate`; the layout the fetch session read from the zip's central
 directory: 9 / 4 / 1 patches at d = 3 / 5 / 7, X and Z, 15 round counts 1, 10, 13, 30, 50, 70, ..., 250, 50,000 shots per
