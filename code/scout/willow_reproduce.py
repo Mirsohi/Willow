@@ -308,6 +308,7 @@ KEYMAP = {
     "D2": [W + "revision/d2_worstcase/d2_worstcase.json"],
     "D3R13": [W + "revision/d3_facts/d3_r13_census.json"], "D3D7": [W + "revision/d3_facts/d3_d7r13_census.json"],
     "D3F": [W + "revision/d3_facts/d3_facts.json", W + "revision/d3_facts/d3_facts.md"], "REP": ["code/decoder/willow_reported.json"],
+    "A1R2": [W + "revision/a1r2/a1r2_results.json"],
     # reservoir
     "GTF": ["results/reservoir/willow_gapmech/final_k2/gap_table.json", "results/reservoir/willow_gapmech/final_k2/gap_series.csv"],
     "EAF": ["results/reservoir/willow_gapmech/final_k2/exact_analysis.json"],
@@ -917,6 +918,7 @@ TABLES = [
         ("census, no exclusion", [("V2D3", "census_growth>none")]),
         ("census, flip rates per round count", [("V2D3", "census_growth>C_only|*|A")]),
         ("census, how the strata", [("V2D3", "census_growth>A")]),
+        ("targeted check of the per-round floor", [("A1R2", "primary"), ("V2D3", "g3_W5", "growth")]),
         ("independent contraction", []),
     ]),
     ("manuscript", "Table 5.", [0, 1], [
@@ -1441,9 +1443,11 @@ def write_manifest(root, out, reads, parent_reads, path):
         files.setdefault(p, set()).add("L2-L4")
     rootabs = os.path.abspath(root)
     outabs = os.path.abspath(out)
+    # the published copy of this manifest, which the ledger cites: a manifest cannot list its own md5
+    selfpath = os.path.join(rootabs, DRAFT, "reproduce_inputs.md")
     rows = []
     for p, users in files.items():
-        if not p.startswith(rootabs + "/") or p.startswith(outabs + "/") or p == THIS:
+        if not p.startswith(rootabs + "/") or p.startswith(outabs + "/") or p == THIS or p == selfpath:
             continue
         if not os.path.isfile(p) or "/__pycache__/" in p:
             continue
@@ -1460,7 +1464,8 @@ def write_manifest(root, out, reads, parent_reads, path):
          "(md5 %s). 'Read by' names the L1 output key, the figure job, or L2-L4 for the entry point itself (the" % md5_file(THIS),
          "draft's figures, its tables and the ledger, and the files they cite). Boards and notes grow by design, so a",
          "later copy of one can differ from the md5 here; the draft's files are those of the draft that was checked;",
-         "every result file and every code file must match.", "",
+         "every result file and every code file must match. The manifest does not list itself: its published copy,",
+         "`%sreproduce_inputs.md`, which the ledger cites, is left out." % DRAFT, "",
          "## Data, results and texts (%d files, %.1f MB)" % (len(data), sum(r[1] for r in data) / 1e6), "",
          "| path | bytes | md5 | read by |", "|---|---|---|---|"]
     L += ["| `%s` | %d | %s | %s |" % r for r in data]
