@@ -10,6 +10,9 @@ final_round1.json (rule A's exclusions), and rev_d2_worstcase.py (entry 7's esti
 
 Definitions.
   q        the MPS decision at the last rung run; "resolved" if the ladder's first stop condition held there.
+           Amendment D1-3 (2026-10-13): q and P_mps come from the last rung with a finite P1 (a rung whose decode
+           raised, or returned a non-finite P1, is NaN); a shot with no finite rung is "failed": it is left out like
+           a shot not decoded, and counted by cell.
   a        the auxiliary decision, known for every shot of the population (a census): B: K2's tau3; D: the non-band
            check's final decision (tau3 where it ran, tau2 elsewhere); C_low, C_high: m. ("plain" mode: a = m everywhere.)
   side     a right (a = o: a disagreement of q with a adds an ML error) or a wrong (removes one).
@@ -22,7 +25,7 @@ Estimates (rules A and none; rule A uses only the sampled shots of its 19 leaves
   the per-side binomial variances with the finite-population factor.
 Worst cases (sensitivity limits): per group (primary: a stratum pooled over r; sensitivity: a cell) and side, the
   disagreement rate at a one-sided Clopper-Pearson bound; unresolved sampled shots count as disagreements for an upper
-  bound and as agreements for a lower bound. "lower" case = a-right rates at the upper bound and a-wrong rates at the
+  bound and as agreements for a lower bound, and so do failed shots (D1-3). "lower" case = a-right rates at the upper bound and a-wrong rates at the
   lower bound (ML's errors up, Libra's gap down); "higher" = the reverse. Levels: separate (each bound 95%) and
   simultaneous (Bonferroni: alpha = 0.05 / (2 x groups) for the two cases, 0.05 / (4 x groups) for the g_5 box).
   g_5 box: extremes of g_5 over the box's vertices (pooled groups: 4 corners per group; cells: the 2 corners that move
@@ -209,15 +212,19 @@ def main():
                "P_paper": float(sig(d["llr"][p])), "P_aux": float(sig(d["la"][p])), "P_t1": float(sig(d["llr_t1"][p])),
                "P_t3_K2": float(sig(d["t3"][p])) if np.isfinite(d["t3"][p]) else None}
         x = mps.get(i)
-        if x is not None:
+        fin = [j for j, v in enumerate(x["P1"]) if math.isfinite(float(v))] if x is not None else []
+        if x is not None and fin:
             Pl = [float(v) for v in x["P1"]]
+            jl = fin[-1]                                           # D1-3: the last rung with a finite P1
             ff = x.get("first_fire")
-            rec.update(mps_done=True, q=int(x["pred"]), resolved=bool(x["resolved"]), P_mps=Pl[-1], P_rungs=Pl,
+            rec.update(mps_done=True, q=int(Pl[jl] > 0.5), resolved=bool(x["resolved"]), P_mps=Pl[jl], P_rungs=Pl,
+                       rung_errors=len(x.get("errors") or []), rungs_nan=len(Pl) - len(fin),
                        chi=int(x["chis"][-1]), rungs=len(Pl), first_fire=ff, pred_first_fire=x.get("pred_first_fire"),
                        audit=bool(x.get("audit", False)), maxbond=max(x["maxbond"]), mps_cpu=float(sum(x["cpu_s"])),
                        dP_last=abs(Pl[-1] - Pl[-2]) if len(Pl) >= 2 else None)
         else:
             rec["mps_done"] = False
+            rec["mps_failed"] = x is not None                     # D1-3: decoded, but no rung gave a finite P1
         y = spr.get(i)
         if y is not None:
             Rr = y["runs"]
@@ -234,7 +241,13 @@ def main():
            "label": "post hoc revision analysis (D1); plan declared (D1-1) and script frozen (D1-2) before any result was read",
            "inputs_md5": inputs, "rule_A_excluded": exA,
            "sample": {"selected": n, "mps_done": len(done), "mps_resolved": sum(s["resolved"] for s in done),
-                      "sparse_done": len(spr)},
+                      "sparse_done": len(spr),
+                      "mps_failed": {f"{s['stratum']}|{s['rounds']}": sum(1 for t in R_ if t.get("mps_failed")
+                                                                          and t["stratum"] == s["stratum"]
+                                                                          and t["rounds"] == s["rounds"])
+                                     for s in R_ if s.get("mps_failed")},
+                      "mps_done_with_rung_errors": sum(1 for s in done if s["rung_errors"]),
+                      "mps_done_with_nan_rungs": sum(1 for s in done if s["rungs_nan"])},
            "cells": meta["cells"]}
     # ------------------------------------------------------------ 1. agreement tables
     def agree(sel, ref):
@@ -265,11 +278,15 @@ def main():
     def stats(domain, mode, keyf):
         ref = "a" if mode == "diff" else "m"
         G = {}
-        for s in done:
+        for s in done + [t for t in R_ if t.get("mps_failed")]:
             if s["leaf"] not in domain:
                 continue
-            c = G.setdefault(keyf(s["stratum"], s["rounds"]), {sd: {"n": 0, "dis": 0, "dis_res": 0, "unres": 0} for sd in SIDES})
+            c = G.setdefault(keyf(s["stratum"], s["rounds"]),
+                             {sd: {"n": 0, "dis": 0, "dis_res": 0, "unres": 0, "failed": 0} for sd in SIDES})
             c = c[side_of(s, ref)]
+            if not s["mps_done"]:                                   # D1-3: a failed shot enters the worst cases only
+                c["failed"] += 1
+                continue
             dis = s["q"] != s[ref]
             c["n"] += 1; c["dis"] += int(dis)
             if s["resolved"]:
@@ -389,10 +406,10 @@ def main():
                 ng = len(keys)
 
                 def bound(key, side, which, alpha, G=G):
-                    c = G.get(key, {}).get(side, {"n": 0, "dis_res": 0, "unres": 0})
+                    c = G.get(key, {}).get(side, {"n": 0, "dis_res": 0, "unres": 0, "failed": 0})
                     if which == "up":
-                        return cp_up(c["dis_res"] + c["unres"], c["n"], alpha)
-                    return cp_lo(c["dis_res"], c["n"], alpha)
+                        return cp_up(c["dis_res"] + c["unres"] + c["failed"], c["n"] + c["failed"], alpha)
+                    return cp_lo(c["dis_res"], c["n"] + c["failed"], alpha)
                 RR[f"groups_{mode}_{gname}"] = {key: G.get(key) for key in keys}
                 for adj, al2 in (("separate", 0.05), ("simultaneous", 0.05 / (2 * ng))):
                     for case, (wr, ww) in (("lower", ("up", "lo")), ("higher", ("lo", "up"))):
@@ -456,6 +473,7 @@ def main():
             diag[f"{s_}|{r}"] = {"n": len(sel), "resolved": sum(s["resolved"] for s in sel),
                                  "chi_reached": {str(c): sum(s["chi"] == c for s in sel) for c in sorted({s["chi"] for s in sel})},
                                  "audited": sum(s["audit"] for s in sel), "max_bond": max(s["maxbond"] for s in sel),
+                                 "with_rung_errors": sum(1 for s in sel if s["rung_errors"]),
                                  "cpu_s_per_shot": float(np.mean([s["mps_cpu"] for s in sel])),
                                  "cpu_s_per_round": float(np.mean([s["mps_cpu"] / s["rounds"] for s in sel]))}
     out["margins"] = marg; out["mps_diagnostics"] = diag

@@ -170,6 +170,11 @@ Scripts:
 - `rev_d3_facts.py` (D3): two censuses.
   - Fault merging in every DEM decoded, with Tesseract's own merge as a check.
   - The sparse decoder's retained-state cap at d = 5.
+- `rev_d3_r13.py` (D3 addendum): the same merge census on the d = 5 DEM files at r = 13 (RL, and SI1000 for
+  completeness), which `rev_d3_facts.py` left out. Each file is first checked against the zip's CRC-32 and the
+  decode summaries' `dem_md5`.
+- `rev_d3_d7r13.py` (D3 addendum 2): the same census on the d = 7 DEM files at r = 13, decoded by round 1's
+  exploratory probe, which `rev_d3_facts.py` also left out (it read d = 7 from the PR3 extract: r = 10, 30, 50).
 - `rev_d4_table13.py` (D4): Table 13's gaps, with the frozen-formula SEs and the corrected SEs (entry 7).
 - `rev_d2_worstcase.py` (D2): rebuilds every row of the non-band check's `nonband_results.json` with its own code, and
   checks g_5 against the frozen estimator. It then states the strata, weights and bounds behind the 95% worst cases,
@@ -184,6 +189,15 @@ Scripts:
     lowered caps as a test.
   - `rev_d1_analyze.py` compares the decodes with the paper's decisions and the census decisions. It derives
     the implied count gap and g_5: estimates, posterior intervals and worst cases.
+- `a1_certify.py`, `a1_perround.py`, `a1_alloc.py`, `a1_width.py`, `a1_ctg_path.py` (A1 of the fresh-eyes review
+  of v2.0 draft 2): analyses of existing outputs only; no decoding. Notes: `notes/decoder/willow_a1_assessment.md`.
+  - `a1_certify.py`: the share of decisions not certified by the dropped-mass indicator D or by the ladder's own
+    change, at several multiples kappa, per stratum and round count.
+  - `a1_perround.py`: the per-round-count limits of g_5 from the non-band check (it reproduces R5), read with the
+    certificates, and with shots added to the cells that set the minimum.
+  - `a1_alloc.py`: the cheapest added sample in those cells for a given lower limit, and named designs.
+  - `a1_width.py`: the frontier width of the exact sweep at d = 5, with its memory and work per shot.
+  - `a1_ctg_path.py`: a cotengra tree search with `ml_cotengra.py`'s own settings (path only, no contraction).
 
 **Stages and cost** (`python3 -I -B willow_stage.py estimate`; the layout the fetch session read from the zip's central
 directory: 9 / 4 / 1 patches at d = 3 / 5 / 7, X and Z, 15 round counts 1, 10, 13, 30, 50, 70, ..., 250, 50,000 shots per

@@ -15,6 +15,9 @@ name (md5 checked); it never reads a stored decision or an observed outcome. One
   sparse  the frozen sparse-frontier decoder, rebuilt as decode_willow builds the ladder (tau1 = 1e-6, kmax =
           KMAX_LADDER, deeper rungs sharing tau1's compiled program), at every (name, tau, kmax) of --sparse-runs,
           except the runs that --sparse-skip lists for the row's stratum (for example "B:t3;C_high:t2_k25000,t3").
+          A rung whose decode raises (numba's LAPACK SVD can stop with "Internal algorithm failed to converge" on a
+          finite matrix) is recorded with P1 = logp = NaN, maxbond = -1 and the error text in "errors", and the ladder
+          goes on to the next chi (amendment D1-3, 2026-10-13). The stop rule never fires next to a NaN rung.
 Each worker takes the rows with worker == --worker (sample) or row mod --workers (probe), in processing order, and
 appends one JSON line per shot to <out>/<mode>_w<k>.jsonl (flushed and fsynced). A restart skips the rows already there.
 Guards, checked before each shot: this worker's CPU so far (all runs; see base_cpu) plus the shot's projected CPU
@@ -191,21 +194,26 @@ def main():
         if a.mode == "mps":
             audit = (not a.probe) and a.audit_every > 0 and (int(order[i]) // a.workers) % a.audit_every == 0
             min_j = (a.audit_min_rungs - 1) if audit else 1
-            P, LP, MB, CPU, CH = [], [], [], [], []
+            P, LP, MB, CPU, CH, ERR = [], [], [], [], [], []
             resolved, first_fire = False, None
             for j, chi in enumerate(chis):
                 D.chi = chi
                 c0 = time.process_time()
-                post, logp = D.class_probs(syn)
+                try:
+                    post, logp = D.class_probs(syn)
+                    p1, lp1, mb1 = float(post[0, 1]), float(logp[0]), int(D.last_maxbond[0])
+                except (ValueError, ArithmeticError, np.linalg.LinAlgError) as e:   # D1-3: record the rung as NaN
+                    p1, lp1, mb1 = float("nan"), float("nan"), -1
+                    ERR.append({"chi": chi, "error": f"{type(e).__name__}: {e}"[:200]})
                 CPU.append(time.process_time() - c0)
-                p1 = float(post[0, 1]); P.append(p1); LP.append(float(logp[0])); MB.append(int(D.last_maxbond[0])); CH.append(chi)
+                P.append(p1); LP.append(lp1); MB.append(mb1); CH.append(chi)
                 if j >= 1:
                     f, resolved = fires(P[-1], P[-2], a.stop_frac)
                     if f and first_fire is None:
                         first_fire = j
                     if f and j >= min_j and not a.all_chis:
                         break
-            rec.update(chis=CH, P1=P, logp=LP, maxbond=MB, cpu_s=CPU, resolved=bool(resolved), audit=bool(audit),
+            rec.update(chis=CH, P1=P, logp=LP, maxbond=MB, cpu_s=CPU, errors=ERR, resolved=bool(resolved), audit=bool(audit),
                        first_fire=first_fire,
                        pred_first_fire=None if first_fire is None else int(np.nan_to_num(P[first_fire], nan=0.0) > 0.5),
                        pred=int(np.nan_to_num(P[-1], nan=0.0) > 0.5))
