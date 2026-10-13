@@ -1,15 +1,22 @@
-"""Synthetic end-to-end check of pr3_r10_analyze.py. For three scenarios the driver pr3_r10_posthoc.py runs the
-frozen runner's loop with fake units (fake_full_decode_willow.py) that write every file the analysis reads; a fake
-round 1 (d = 3: 9 patches x 2 bases, "rl"; d = 5: 4 patches x 2 bases, "rl_s5"; one d = 5 Z leaf excluded under rule
-A), its final analysis.json and final_round1.json are written here; PR3's real leaf table is read. The analysis runs as
-a subprocess; its numbers are compared with direct computations from the generated arrays.
-  A: X fails the ladder and passes the extra rung, Z passes the ladder -> X and Z.
-  B: X still fails after the extra rung, Z passes -> Z only (d = 3: 9 leaves, d = 5: 3, d = 7: 1).
-  C: both still fail -> leaf rows only.
-Also: a tampered tally fails a check (exit 1); an incomplete tally is refused; fieller() against a brute-force
-inversion; the delta-method SE of g_3 and g_7 against a bootstrap made here.
-usage: PR3_CODE=<code/decoder> python3 -I -B test_r10_analyze.py <code/decoder/pr3> <analyze script folder> <scratch>
-       <real pr3_leaf_table.json>"""
+"""Synthetic end-to-end check of pr3_r10_analyze.py (v2: amendment 10a's tau4 rung). For four scenarios the driver
+pr3_r10_posthoc.py runs the frozen runner's loop with fake units (fake_full_decode_willow.py) that write every file the
+analysis reads; where a leaf still fails after tau3, pr3_r10_tau4.py's scheduler runs with fake tau4 parts
+(fake_tau4_worker.py). A fake round 1 (d = 3: 9 patches x 2 bases, "rl"; d = 5: 4 patches x 2 bases, "rl_s5"; one d = 5
+Z leaf excluded under rule A), its final analysis.json and final_round1.json are written here; PR3's real leaf table is
+read. The analysis runs as a subprocess; its numbers are compared with direct computations from the generated arrays.
+  A: X fails the ladder and passes the extra rung, Z passes the ladder -> X and Z (no tau4).
+  B: X still fails after tau3 and after tau4, Z passes -> Z only (d = 3: 9 leaves, d = 5: 3, d = 7: 1).
+  C: both still fail after tau3, and tau4's projection is over the cap: tau4 does not start -> leaf rows only, with the
+     projection reported.
+  D: X still fails after tau3 and passes at the tau4 rung, Z passes -> X and Z, with X's ML(RL) taking tau3's
+     decisions on its band shots (10a).
+Also: a tampered tally and a tampered tau4 tally fail a check (exit 1); an incomplete tally, a missing tau4 tally and a
+tau4 tally that is not final are refused; fieller() against a brute-force inversion; the delta-method SE of g_3 and g_7
+against a bootstrap made here.
+The machine may be running the real r = 10 driver: the schedulers' heavy-process scans are limited to this test's
+processes, driver_alive() is stubbed, and subprocess's _cleanup() is off (see test_r10_tau4.py).
+usage: PR3_CODE=<code/decoder> python3 -I -B test_r10_analyze.py <code/decoder/pr3> <analyze and tau4 script folder>
+       <scratch> <real pr3_leaf_table.json>"""
 import json, math, os, shutil, subprocess, sys, tempfile, types
 CODE_PR3, ACODE, SCR, LT_REAL = sys.argv[1:5]
 sys.path.insert(0, CODE_PR3)
@@ -18,10 +25,15 @@ import pr3_r10_posthoc as D
 C, PRR = D.C, D.PRR
 sys.path.insert(0, ACODE)
 import pr3_r10_analyze as A
+import pr3_r10_tau4 as T4
+T4.driver_alive = lambda: False
+subprocess._cleanup = lambda: None
 HERE = os.path.dirname(os.path.abspath(__file__))
 FAKE = os.path.join(HERE, "fake_full_decode_willow.py")
+FAKE4 = os.path.join(HERE, "fake_tau4_worker.py")
 ASCRIPT = os.path.join(ACODE, "pr3_r10_analyze.py")
 EXP = C.EXP
+LX = C.leaf("X", 10)
 ok = []
 
 
@@ -31,6 +43,11 @@ def check(cond, what):
 
 def eps(E, r=10):
     return 0.5 * (1 - (1 - 2 * E) ** (1 / r))
+
+
+def only(T, scan):
+    key = T.encode()
+    return lambda me: [p for p in scan(me) if any(key in c for c in p["cmd"])]
 
 
 def run_driver(T, modes):
@@ -44,6 +61,7 @@ def run_driver(T, modes):
                               pilot=os.path.join(T, "pilot.json"), design="25k", guard_core_hours=13.0, max_heavy=4,
                               min_free_gib=3, cap_gib=4, poll=0.3, dry_run=False)
     R = D.R10(a)
+    R.procs.scan = only(T, R.procs.scan)
 
     def cmd(u):
         lf, j = u["leaf"], u["part"]
@@ -53,6 +71,18 @@ def run_driver(T, modes):
         return [sys.executable, "-I", "-B", FAKE, json.dumps(arg)]
     R.cmd = cmd
     return R.run(), a
+
+
+def run_tau4(T, a, mode, guard=13.0):
+    b = types.SimpleNamespace(root="/nonexistent", res=a.res, ledger=os.path.join(a.state, "ledger.json"),
+                              work=os.path.join(T, "w4"), state=os.path.join(T, "s4"), logs=os.path.join(T, "l4"),
+                              design="25k", guard_core_hours=guard, max_heavy=4, min_free_gib=3.0, cap_gib=4.0,
+                              poll=0.2, dry_run=False, worker=None)
+    S = T4.Tau4(b)
+    S.procs.scan = only(T, S.procs.scan)
+    S.cmd = lambda lf, j: [sys.executable, "-I", "-B", FAKE4, json.dumps({"odir": S.odir(lf, j), "edir": S.edir(lf, j),
+                                                                          "mode": mode, "part": j, "seconds": 0})]
+    return S.run(), os.path.join(T, "s4", "tau4_ledger.json")
 
 
 SHIPPED = ["decoding_results/correlated_matching_decoder_with_rl_optimized_prior/obs_flips_predicted.b8",
@@ -112,8 +142,9 @@ def make_round1(T):
     return root, fr1, fan, truth, excl
 
 
-def d7_truth(res):
-    """Errors and 2x2 tables per basis on the PR3 sample, read directly from the parts."""
+def d7_truth(res, tau3_bases=()):
+    """Errors and 2x2 tables per basis on the PR3 sample, read directly from the parts. For a basis in tau3_bases,
+    ML(RL) takes tau3's decisions (llr_t3 > 0) on the band shots."""
     out = {}
     for b in ("X", "Z"):
         lf = C.leaf(b, 10)
@@ -121,9 +152,15 @@ def d7_truth(res):
         for j in range(5):
             dd = os.path.join(res, "parts", f"p{j}", "decode", lf, "rl_25k")
             z = np.load(os.path.join(dd, PRR.LADDER_DN + ".npz")); sh = np.load(os.path.join(dd, "shots.npz"))
-            cols["idx"].append(sh["idx"]); cols["obs"].append(sh["obs"]); cols["ML.rl"].append(z["pred"][:, 0])
-            for e, row in zip(SH_ENT, sh["shipped"]):
-                cols[e].append(row)
+            ml = z["pred"][:, 0].copy()
+            if b in tau3_bases:
+                e = np.load(os.path.join(res, "parts", f"p{j}", "extra_rung", lf, "rl_25k", "extra_rung.npz"))
+                where = np.searchsorted(z["idx"], e["idx"])
+                assert np.array_equal(z["idx"][where], e["idx"])
+                ml[where] = (e["llr_t3"] > 0)
+            cols["idx"].append(sh["idx"]); cols["obs"].append(sh["obs"]); cols["ML.rl"].append(ml)
+            for e_, row in zip(SH_ENT, sh["shipped"]):
+                cols[e_].append(row)
             for bb in ("corr_mwpm", "mwpm"):
                 cols[bb + ".rl"].append(np.load(os.path.join(dd, bb + ".npz"))["pred"][:, 0])
         c = {k: np.concatenate(v) for k, v in cols.items()}
@@ -150,37 +187,62 @@ def boot_g(tabs, reps, seed):
     return float(np.std(gs, ddof=1))
 
 
-def run_analysis(T, a, root, fr1, fan, out, ledger=None):
+def run_analysis(T, a, root, fr1, fan, out, ledger=None, tau4_ledger=None):
     env = dict(os.environ)
-    p = subprocess.run([sys.executable, "-I", "-B", ASCRIPT, "--res", a.res, "--ledger", ledger or os.path.join(a.state, "ledger.json"),
-                        "--round1", root, "--final-r1", fr1, "--final-analysis", fan, "--pr3-leaf-table", LT_REAL,
-                        "--out", out], capture_output=True, text=True, env=env, cwd=T)
-    return p
+    cmd = [sys.executable, "-I", "-B", ASCRIPT, "--res", a.res, "--ledger", ledger or os.path.join(a.state, "ledger.json"),
+           "--round1", root, "--final-r1", fr1, "--final-analysis", fan, "--pr3-leaf-table", LT_REAL, "--out", out]
+    if tau4_ledger:
+        cmd += ["--tau4-ledger", tau4_ledger]
+    return subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=T)
 
 
 LTR = json.load(open(LT_REAL))
-for scen, modes in (("A", {"X": "extra", "Z": "pass"}), ("B", {"X": "fail", "Z": "pass"}), ("C", {"X": "fail", "Z": "fail"})):
-    print(f"---- scenario {scen}: {modes}")
+SCEN = (("A", {"X": "extra", "Z": "pass"}, None), ("B", {"X": "fail", "Z": "pass"}, "fail"),
+        ("C", {"X": "fail", "Z": "fail"}, "over the cap"), ("D", {"X": "fail", "Z": "pass"}, "pass"))
+WANT = {"A": {"X": "pass (extra rung)", "Z": "pass (ladder)"},
+        "B": {"X": "still fails after tau4: excluded and flagged", "Z": "pass (ladder)"},
+        "C": {"X": "tau4 incomplete: leaf rows only", "Z": "tau4 incomplete: leaf rows only"},
+        "D": {"X": "pass (tau4 rung)", "Z": "pass (ladder)"}}
+for scen, modes, t4mode in SCEN:
+    print(f"---- scenario {scen}: {modes}, tau4 {t4mode}")
     T = tempfile.mkdtemp(dir=SCR)
     code, a = run_driver(T, modes)
     Tl = json.load(open(os.path.join(a.res, "r10_tally.json")))
     check(code == 0 and Tl["complete"], f"{scen}: driver exit {code}, tally complete {Tl['complete']}, still failing "
           f"{[x.split('/', 2)[-1] for x in Tl['still_failing']]}")
     root, fr1, fan, truth, excl = make_round1(T)
+    l4 = None
+    if t4mode:
+        p0 = run_analysis(T, a, root, fr1, fan, os.path.join(T, "out_no_t4"))
+        check(p0.returncode == 1 and "run pr3_r10_tau4.py first" in p0.stderr and not os.path.exists(os.path.join(T, "out_no_t4")),
+              f"{scen}: a leaf still fails after tau3 and no tau4 tally exists: refused, nothing written")
+        c4, l4 = run_tau4(T, a, "pass" if t4mode == "over the cap" else t4mode, guard=1e-6 if t4mode == "over the cap" else 13.0)
+        check(c4 == (6 if t4mode == "over the cap" else 0), f"{scen}: tau4 exit {c4}")
     out = os.path.join(T, "out")
-    p = run_analysis(T, a, root, fr1, fan, out)
+    p = run_analysis(T, a, root, fr1, fan, out, tau4_ledger=l4)
     check(p.returncode == 0, f"{scen}: analysis exit {p.returncode} {p.stderr.strip()[-300:]}")
     o = json.load(open(os.path.join(out, "analysis", "r10_results.json")))
     md = open(os.path.join(out, "analysis", "r10_results.md")).read()
     check(o["all_checks_ok"], f"{scen}: all {len(o['checks'])} checks of the analysis pass "
           f"{[c['what'] for c in o['checks'] if not c['ok']]}")
-    want_pass = [b for b in ("X", "Z") if modes[b] != "fail"]
+    want_pass = [b for b in ("X", "Z") if WANT[scen][b].startswith("pass")]
     check(o["passing_bases"] == want_pass, f"{scen}: passing bases {o['passing_bases']} (want {want_pass})")
     for b in ("X", "Z"):
         lf = C.leaf(b, 10); row = o["leaves"][lf]
-        want = {"pass": "pass (ladder)", "extra": "pass (extra rung)", "fail": "still fails: excluded and flagged"}[modes[b]]
-        check(row["verdict"] == want and len(row["extra_parts_done"]) == (0 if modes[b] == "pass" else 5),
-              f"{scen}: {b}/r10 row: {row['verdict']}, extra parts {row['extra_parts_done']}")
+        t4row = modes[b] == "fail"
+        check(row["verdict"] == WANT[scen][b] and len(row["extra_parts_done"]) == (0 if modes[b] == "pass" else 5)
+              and (row.get("verdict_after_tau3") == "still fails: excluded and flagged") == t4row
+              and ("tau3_tau4" in row) == (t4row and t4mode in ("pass", "fail")),
+              f"{scen}: {b}/r10 row: {row['verdict']}, extra parts {row['extra_parts_done']}, after tau3 "
+              f"{row.get('verdict_after_tau3')}, tau4 rows {'tau3_tau4' in row}")
+    cpu = o["cpu"]
+    L1 = json.load(open(os.path.join(a.state, "ledger.json")))["units"]
+    L4u = json.load(open(l4))["units"] if l4 else {}
+    d_h = sum((x.get("cpu_s") or 0) + (x.get("lost_cpu_s") or 0) for x in L1.values()) / 3600
+    t_h = sum((x.get("cpu_s") or 0) + (x.get("lost_cpu_s") or 0) for x in L4u.values()) / 3600
+    check(abs(cpu["driver_core_h"] - d_h) < 1e-12 and abs(cpu["tau4_core_h"] - t_h) < 1e-12
+          and abs(cpu["core_h"] - d_h - t_h) < 1e-12 and (t_h > 0) == (t4mode in ("pass", "fail")),
+          f"{scen}: CPU {cpu['core_h'] * 3600:.1f} s = driver {d_h * 3600:.1f} s + tau4 {t_h * 3600:.1f} s")
     # leaf table
     LT = json.load(open(os.path.join(out, "leaf_table", "pr3_leaf_table_with_r10.json")))
     same_other = all({k: v for k, v in LT["leaves"][lf].items() if k != "source"} == LTR["leaves"][lf]
@@ -188,18 +250,32 @@ for scen, modes in (("A", {"X": "extra", "Z": "pass"}), ("B", {"X": "fail", "Z":
     check(len(LT["leaves"]) == 6 and same_other and all(LT["leaves"][C.leaf(b, 10)]["source"].startswith("post hoc") for b in "XZ"),
           f"{scen}: combined leaf table: 6 rows, PR3's 4 rows unchanged, 2 post hoc rows")
     lmd = open(os.path.join(out, "leaf_table", "pr3_leaf_table_with_r10.md")).read()
-    check(lmd.count("| post hoc |") == 2 and lmd.count("| PR3 |") == 4, f"{scen}: leaf table md has 2 post hoc and 4 PR3 rows")
+    n_t4rows = 1 if t4mode in ("pass", "fail") else 0
+    check(lmd.count("| post hoc |") == 2 and lmd.count("| PR3 |") == 4 and lmd.count("τ3 → τ4 (10a)") == n_t4rows
+          and md.count("τ3 → τ4 (10a)") == n_t4rows,
+          f"{scen}: leaf table md has 2 post hoc and 4 PR3 rows, and {n_t4rows} tau3 -> tau4 row(s); so has the results md")
+    if t4mode:
+        check("τ4 rung (amendment 10a):" in md and (("Projection:" in md) == (t4mode == "over the cap")),
+              f"{scen}: the md has the tau4 paragraph" + (", with the projection" if t4mode == "over the cap" else ""))
     if not want_pass:
         check("gaps" not in o and "No r = 10 leaf passes" in md, f"{scen}: no gap numbers; the md says so")
         continue
     # direct computations
-    t7 = d7_truth(a.res)
+    t3b = ("X",) if WANT[scen]["X"] == "pass (tau4 rung)" else ()
+    t7 = d7_truth(a.res, t3b)
     for b in want_pass:
-        for e in A.ENTS:
+        for e in ("ML.rl",) + A.ENTS:
             k = int((t7[b][e] != t7[b]["obs"]).sum())
             if o["d7_counts"][b]["errors"][e] != k:
                 check(False, f"{scen}: {b} {e} errors {o['d7_counts'][b]['errors'][e]} vs direct {k}")
-    check(True, f"{scen}: d = 7 error counts equal direct counts ({len(want_pass)} bases x {len(A.ENTS)} decoders)")
+    check(True, f"{scen}: d = 7 error counts equal direct counts ({len(want_pass)} bases x {len(A.ENTS) + 1} decoders)")
+    if t3b:
+        vX = Tl["verdicts"][LX]
+        kml = o["d7_counts"]["X"]["errors"]["ML.rl"]
+        check(kml == vX["extra"]["errors_tau3"] != vX["ladder"]["errors_tau2"]
+              and o["d7_counts"]["X"]["ml_rl_decisions"].startswith("tau3") and "takes τ3's decisions" in md,
+              f"{scen}: X's ML(RL) errors {kml} are tau3's ({vX['extra']['errors_tau3']}), not tau2's "
+              f"({vX['ladder']['errors_tau2']}); the md says so")
     nser = {3: 9 * len(want_pass), 5: (3 if want_pass == ["Z"] else (4 if want_pass == ["X"] else 7)), 7: len(want_pass)}
     worst = 0.0
     for e in A.ENTS:
@@ -241,7 +317,7 @@ for scen, modes in (("A", {"X": "extra", "Z": "pass"}), ("B", {"X": "fail", "Z":
               f"{scen}: {e}: eps_7 {e7:.4e}, Lambda_5/7 {L['Lambda_5_7']['Lambda']:.3f} = {e5 / e7:.3f}, d = 5 leaves {len(L['d5_series'])}")
     if len(want_pass) == 1:
         check(f"Only {want_pass[0]}/r10 passes" in md, f"{scen}: the md labels the one-basis result")
-    # negative tests on scenario A only
+    # negative tests
     if scen == "A":
         bad = os.path.join(T, "res_bad"); shutil.copytree(a.res, bad)
         tb = json.load(open(os.path.join(bad, "r10_tally.json")))
@@ -257,6 +333,28 @@ for scen, modes in (("A", {"X": "extra", "Z": "pass"}), ("B", {"X": "fail", "Z":
         p3 = run_analysis(T, a2, root, fr1, fan, os.path.join(T, "out_bad2"))
         check(p3.returncode == 1 and "not complete" in p3.stderr and not os.path.exists(os.path.join(T, "out_bad2")),
               f"A, incomplete tally: refused (exit {p3.returncode}: {p3.stderr.strip()[-80:]}), nothing written")
+    if scen == "D":
+        bad = os.path.join(T, "res_bad4"); shutil.copytree(a.res, bad)
+        tb = json.load(open(os.path.join(bad, "r10_tau4_tally.json")))
+        tb["verdicts"][LX]["errors_tau4"] += 1
+        json.dump(tb, open(os.path.join(bad, "r10_tau4_tally.json"), "w"))
+        a2 = types.SimpleNamespace(**dict(vars(a), res=bad))
+        p2 = run_analysis(T, a2, root, fr1, fan, os.path.join(T, "out_bad4"), tau4_ledger=l4)
+        o2 = json.load(open(os.path.join(T, "out_bad4", "analysis", "r10_results.json")))
+        failed = [c["what"] for c in o2["checks"] if not c["ok"]]
+        check(p2.returncode == 1 and failed == ["X/r10: tau3 -> tau4 values equal the tau4 tally's"],
+              f"D, tampered tau4 tally: exit {p2.returncode}; failed: {failed}")
+        p5 = run_analysis(T, a, root, fr1, fan, os.path.join(T, "out_no_l4"))
+        o5 = json.load(open(os.path.join(T, "out_no_l4", "analysis", "r10_results.json")))
+        check(p5.returncode == 1 and any("tau4 CPU" in c["what"] and not c["ok"] for c in o5["checks"]),
+              f"D, the tau4 ledger left out: exit {p5.returncode}, the tau4 CPU check fails")
+        tb = json.load(open(os.path.join(a.res, "r10_tau4_tally.json")))
+        tb["verdicts"][LX]["errors_tau4"] -= 1
+        tb["final"] = False
+        json.dump(tb, open(os.path.join(bad, "r10_tau4_tally.json"), "w"))
+        p6 = run_analysis(T, a2, root, fr1, fan, os.path.join(T, "out_bad6"), tau4_ledger=l4)
+        check(p6.returncode == 1 and "not final" in p6.stderr and not os.path.exists(os.path.join(T, "out_bad6")),
+              f"D, a tau4 tally that is not final: refused (exit {p6.returncode}: {p6.stderr.strip()[-60:]}), nothing written")
 
 # fieller() against a brute-force inversion
 for a_, sa, b_, sb in ((0.10, 0.02, 0.05, 0.01), (0.07, 0.03, 0.02, 0.008), (-0.01, 0.02, 0.05, 0.02)):

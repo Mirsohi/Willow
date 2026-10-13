@@ -1,0 +1,166 @@
+---- scenario A: {'X': 'extra', 'Z': 'pass'}
+2026-10-13T01:37:01Z pr3_r10_posthoc (md5 f6e263ca9c6f996f42fed1606546d355): post hoc r = 10 follow-up (willow_prereg_r3.md section 10): X/r10 and Z/r10 only; PR3's kill stands and H7 stays not evaluated; no kill rule here; leaves X/r10, Z/r10; 10 ladder parts
+2026-10-13T01:37:01Z pr3_runner (md5 4bd2a21a995b30b93edfaf9a603903d7) design 25k, guard 13.0 core-hours, at most 4 heavy processes, 3 GiB kept free, cap 4 GiB
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0 (pid 1794; projected 0.62 core-hours)
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1 (pid 1795; projected 0.62 core-hours)
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2 (pid 1796; projected 0.62 core-hours)
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3 (pid 1797; projected 0.62 core-hours)
+2026-10-13T01:37:01Z 0 heavy processes, holds {}, PR3 running 4; projection 7.2 core-hours (used 0.0); verdicts X/r10: ladder running or pending, Z/r10: ladder running or pending
+2026-10-13T01:37:01Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:01Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:01Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:01Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4 (pid 1798; projected 0.00 core-hours)
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0 (pid 1799; projected 0.00 core-hours)
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1 (pid 1800; projected 0.00 core-hours)
+2026-10-13T01:37:01Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2 (pid 1801; projected 0.00 core-hours)
+2026-10-13T01:37:02Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:02Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:02Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:02Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:02Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2 (pid 1802; projected 0.12 core-hours)
+2026-10-13T01:37:02Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0 (pid 1803; projected 0.11 core-hours)
+2026-10-13T01:37:02Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1 (pid 1804; projected 0.11 core-hours)
+2026-10-13T01:37:02Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3 (pid 1805; projected 0.10 core-hours)
+2026-10-13T01:37:03Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3 (pid 1806; projected 0.00 core-hours)
+2026-10-13T01:37:03Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4 (pid 1807; projected 0.00 core-hours)
+2026-10-13T01:37:03Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4 (pid 1808; projected 0.00 core-hours)
+2026-10-13T01:37:03Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:03Z exit 0: all units done
+ok   A: driver exit 0, tally complete True, still failing []
+ok   A: analysis exit 0 
+ok   A: all 50 checks of the analysis pass []
+ok   A: passing bases ['X', 'Z'] (want ['X', 'Z'])
+ok   A: X/r10 row: pass (extra rung), extra parts [0, 1, 2, 3, 4]
+ok   A: Z/r10 row: pass (ladder), extra parts []
+ok   A: combined leaf table: 6 rows, PR3's 4 rows unchanged, 2 post hoc rows
+ok   A: leaf table md has 2 post hoc and 4 PR3 rows
+ok   A: d = 7 error counts equal direct counts (2 bases x 7 decoders)
+ok   A: libra.rl d = 3: 18 series (want 18)
+ok   A: libra.rl d = 5: 7 series (want 7)
+ok   A: libra.rl g7/g5 = 8.837, CI None
+ok   A: every g equals the direct mean(eps_A - eps_ML) / mean(eps_ML) (largest diff 4.4e-16)
+ok   A: Libra g_3: delta-method SE 0.0049, bootstrap here 0.0052
+ok   A: Libra g_7: delta-method SE 0.0126, bootstrap here 0.0128, the script's bootstrap 0.0124
+ok   A: ML.rl: eps_7 1.9227e-03, Lambda_5/7 1.652 = 1.652, d = 5 leaves 7
+ok   A: libra.rl: eps_7 2.0437e-03, Lambda_5/7 1.578 = 1.578, d = 5 leaves 8
+ok   A, tampered tally: exit 1; failed: ["Z/r10: tau1 -> tau2 values equal the tally's", "Z/r10: the sample's ML(RL) errors equal the tally's (419)"]
+ok   A, incomplete tally: refused (exit 1: the r = 10 tally is not complete: every leaf needs a final verdict), nothing written
+---- scenario B: {'X': 'fail', 'Z': 'pass'}
+2026-10-13T01:37:07Z pr3_r10_posthoc (md5 f6e263ca9c6f996f42fed1606546d355): post hoc r = 10 follow-up (willow_prereg_r3.md section 10): X/r10 and Z/r10 only; PR3's kill stands and H7 stays not evaluated; no kill rule here; leaves X/r10, Z/r10; 10 ladder parts
+2026-10-13T01:37:07Z pr3_runner (md5 4bd2a21a995b30b93edfaf9a603903d7) design 25k, guard 13.0 core-hours, at most 4 heavy processes, 3 GiB kept free, cap 4 GiB
+2026-10-13T01:37:07Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0 (pid 1821; projected 0.62 core-hours)
+2026-10-13T01:37:07Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1 (pid 1822; projected 0.62 core-hours)
+2026-10-13T01:37:07Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2 (pid 1823; projected 0.62 core-hours)
+2026-10-13T01:37:07Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3 (pid 1824; projected 0.62 core-hours)
+2026-10-13T01:37:07Z 0 heavy processes, holds {}, PR3 running 4; projection 7.2 core-hours (used 0.0); verdicts X/r10: ladder running or pending, Z/r10: ladder running or pending
+2026-10-13T01:37:08Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:08Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:08Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:08Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:08Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4 (pid 1825; projected 0.00 core-hours)
+2026-10-13T01:37:08Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0 (pid 1826; projected 0.00 core-hours)
+2026-10-13T01:37:08Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1 (pid 1827; projected 0.00 core-hours)
+2026-10-13T01:37:08Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2 (pid 1828; projected 0.00 core-hours)
+2026-10-13T01:37:09Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2 (pid 1829; projected 0.12 core-hours)
+2026-10-13T01:37:09Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0 (pid 1830; projected 0.11 core-hours)
+2026-10-13T01:37:09Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1 (pid 1831; projected 0.11 core-hours)
+2026-10-13T01:37:09Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3 (pid 1832; projected 0.10 core-hours)
+2026-10-13T01:37:09Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:09Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3 (pid 1833; projected 0.00 core-hours)
+2026-10-13T01:37:09Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4 (pid 1834; projected 0.00 core-hours)
+2026-10-13T01:37:09Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4 (pid 1835; projected 0.00 core-hours)
+2026-10-13T01:37:10Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:10Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:10Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:10Z exit 0: all units done
+ok   B: driver exit 0, tally complete True, still failing ['X/r10']
+ok   B: analysis exit 0 
+ok   B: all 41 checks of the analysis pass []
+ok   B: passing bases ['Z'] (want ['Z'])
+ok   B: X/r10 row: still fails: excluded and flagged, extra parts [0, 1, 2, 3, 4]
+ok   B: Z/r10 row: pass (ladder), extra parts []
+ok   B: combined leaf table: 6 rows, PR3's 4 rows unchanged, 2 post hoc rows
+ok   B: leaf table md has 2 post hoc and 4 PR3 rows
+ok   B: d = 7 error counts equal direct counts (1 bases x 7 decoders)
+ok   B: libra.rl d = 3: 9 series (want 9)
+ok   B: libra.rl d = 5: 3 series (want 3)
+ok   B: libra.rl g7/g5 = 2.415, CI None
+ok   B: every g equals the direct mean(eps_A - eps_ML) / mean(eps_ML) (largest diff 9.9e-16)
+ok   B: Libra g_3: delta-method SE 0.0071, bootstrap here 0.0067
+ok   B: Libra g_7: delta-method SE 0.0186, bootstrap here 0.0187, the script's bootstrap 0.0186
+ok   B: ML.rl: eps_7 1.7739e-03, Lambda_5/7 1.809 = 1.809, d = 5 leaves 3
+ok   B: libra.rl: eps_7 1.8686e-03, Lambda_5/7 1.772 = 1.772, d = 5 leaves 4
+ok   B: the md labels the one-basis result
+---- scenario C: {'X': 'fail', 'Z': 'fail'}
+2026-10-13T01:37:13Z pr3_r10_posthoc (md5 f6e263ca9c6f996f42fed1606546d355): post hoc r = 10 follow-up (willow_prereg_r3.md section 10): X/r10 and Z/r10 only; PR3's kill stands and H7 stays not evaluated; no kill rule here; leaves X/r10, Z/r10; 10 ladder parts
+2026-10-13T01:37:13Z pr3_runner (md5 4bd2a21a995b30b93edfaf9a603903d7) design 25k, guard 13.0 core-hours, at most 4 heavy processes, 3 GiB kept free, cap 4 GiB
+2026-10-13T01:37:13Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0 (pid 1840; projected 0.62 core-hours)
+2026-10-13T01:37:13Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1 (pid 1841; projected 0.62 core-hours)
+2026-10-13T01:37:13Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2 (pid 1842; projected 0.62 core-hours)
+2026-10-13T01:37:13Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3 (pid 1843; projected 0.62 core-hours)
+2026-10-13T01:37:13Z 0 heavy processes, holds {}, PR3 running 4; projection 7.2 core-hours (used 0.0); verdicts X/r10: ladder running or pending, Z/r10: ladder running or pending
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4 (pid 1844; projected 0.00 core-hours)
+2026-10-13T01:37:14Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0 (pid 1845; projected 0.00 core-hours)
+2026-10-13T01:37:14Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1 (pid 1846; projected 0.00 core-hours)
+2026-10-13T01:37:14Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2 (pid 1847; projected 0.00 core-hours)
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:14Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2 (pid 1848; projected 0.12 core-hours)
+2026-10-13T01:37:14Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0 (pid 1849; projected 0.11 core-hours)
+2026-10-13T01:37:14Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1 (pid 1850; projected 0.11 core-hours)
+2026-10-13T01:37:14Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3 (pid 1851; projected 0.10 core-hours)
+2026-10-13T01:37:15Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:15Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:15Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:15Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:15Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3 (pid 1852; projected 0.00 core-hours)
+2026-10-13T01:37:15Z start ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4 (pid 1853; projected 0.00 core-hours)
+2026-10-13T01:37:15Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4 (pid 1854; projected 0.00 core-hours)
+2026-10-13T01:37:16Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z done ladder google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/X/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3 (pid 1855; projected 0.00 core-hours)
+2026-10-13T01:37:16Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1 (pid 1856; projected 0.00 core-hours)
+2026-10-13T01:37:16Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4 (pid 1857; projected 0.00 core-hours)
+2026-10-13T01:37:16Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2 (pid 1858; projected 0.00 core-hours)
+2026-10-13T01:37:16Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p3: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p1: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p4: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p2: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:16Z start extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0 (pid 1859; projected 0.00 core-hours)
+2026-10-13T01:37:17Z done extra google_105Q_surface_code_d3_d5_d7/d7_at_q6_7/Z/r10 p0: 0.00 core-hours, peak 0.04 GiB
+2026-10-13T01:37:17Z exit 0: all units done
+ok   C: driver exit 0, tally complete True, still failing ['X/r10', 'Z/r10']
+ok   C: analysis exit 0 
+ok   C: all 12 checks of the analysis pass []
+ok   C: passing bases [] (want [])
+ok   C: X/r10 row: still fails: excluded and flagged, extra parts [0, 1, 2, 3, 4]
+ok   C: Z/r10 row: still fails: excluded and flagged, extra parts [0, 1, 2, 3, 4]
+ok   C: combined leaf table: 6 rows, PR3's 4 rows unchanged, 2 post hoc rows
+ok   C: leaf table md has 2 post hoc and 4 PR3 rows
+ok   C: no gap numbers; the md says so
+ok   fieller(0.1, 0.02, 0.05, 0.01) = 2.000 [1.1044, 3.6218]; brute force [1.1045, 3.6218]
+ok   fieller(0.07, 0.03, 0.02, 0.008) = 3.500 [0.5307, 17.6349]; brute force [0.5308, 17.6348]
+ok   fieller(-0.01, 0.02, 0.05, 0.02) = -0.200 [-1.8459, 0.8079]; brute force [-1.8459, 0.8078]
+ok   fieller with a denominator CI containing 0: unbounded
+50 of 50 checks pass

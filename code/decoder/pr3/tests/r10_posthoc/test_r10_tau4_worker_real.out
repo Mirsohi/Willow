@@ -1,0 +1,17 @@
+    google_105Q_surface_code_d3_d5_d7/d5_at_q4_7/X/r10: 10000 shots, 3 band shots, r = 10; tau3 check at 1e-09 (kmax 2000000) on 3
+      tau3 check passed (4 CPU s); tau4 = 1e-10 (kmax 8000000) on 3 band shots, chunks of 5
+      chunk 0: 3 shots, 10 CPU s, max K 70292
+      tau4 done: 10 CPU s, max K 70292, 0 at kmax
+ok   exit 0; tau3 check on 3 band shots identical: True
+ok   tau4 = 1e-10 on 3 band shots: finite, max K 70292 < 8000000; 10.2 CPU s
+ok   tau4's shots are the first 3 band shots of the stored tau3
+    stored tau3 llr [ 0.15607642 -0.28575176 -0.35451418], tau4 llr [ 0.15709247 -0.2862855  -0.35409912]
+    google_105Q_surface_code_d3_d5_d7/d5_at_q4_7/X/r10: 10000 shots, 3 band shots, r = 10; tau3 check at 1e-09 (kmax 2000000) on 3
+      tau3 check passed (3 CPU s); tau4 = 1e-10 (kmax 8000000) on 3 band shots, chunks of 5
+      tau4 done: 10 CPU s, max K 70292, 0 at kmax
+ok   rerun: every chunk reused, same arrays
+    google_105Q_surface_code_d3_d5_d7/d5_at_q4_7/X/r10: 10000 shots, 3 band shots, r = 10; tau3 check at 1e-09 (kmax 2000000) on 3
+      tau3 check FAILED (max |llr diff| 0.001); tau4 not run
+ok   a changed stored tau3: exit 4, verdict 'not run: the rebuilt tau3 rung does not reproduce the stored tau3', no npz
+    CPU of this test: 21.8 s
+5 of 5 checks pass

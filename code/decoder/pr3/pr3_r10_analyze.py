@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 """PR3's post hoc r = 10 follow-up: the analysis declared in notes/decoder/willow_prereg_r3.md section 10, before any
-r = 10 part started. Descriptive only: no test and no p-value. PR3's kill stands, and H7 stays not evaluated.
+r = 10 part started, with amendment 10a (the tau4 rung). Descriptive only: no test and no p-value. PR3's kill stands,
+and H7 stays not evaluated.
 
-Inputs, all read-only: the follow-up's parts and r10_tally.json (--res); the driver's final ledger (--ledger); round 1's
-decode folders (--round1: results/decoder/willow); final_round1.json (--final-r1: rule A's excluded leaves); round 1's
-final analysis.json (--final-analysis: for cross-checks); PR3's leaf table (--pr3-leaf-table). A tally that is not
-complete (a leaf without a final verdict) is refused.
+Inputs, all read-only: the follow-up's parts, r10_tally.json and, if it exists, r10_tau4_tally.json (--res); the
+driver's final ledger (--ledger) and the tau4 ledger (--tau4-ledger, if tau4 ran); round 1's decode folders (--round1:
+results/decoder/willow); final_round1.json (--final-r1: rule A's excluded leaves); round 1's final analysis.json
+(--final-analysis: for cross-checks); PR3's leaf table (--pr3-leaf-table). Refused: a tally that is not complete (a
+leaf without a final verdict); a leaf that still fails after tau3 with no r10_tau4_tally.json; a tau4 tally that is
+not final or names other leaves.
 
 1. Leaf rows of X/r10 and Z/r10, built as pr3_leaf_table.py builds PR3's (same keys, same formulas): the verdict, the
    parts that ran, the rules' values between tau1 and tau2 and between tau2 and tau3 (rule 1: |k_new - k_old|;
    rule 2': decisions changed; both against max(3, 1% of k_new)), the largest |dP| (descriptive), NaN posteriors, band
    shots at kmax, the tau2 rebuild checks, CPU from the ledger (cpu_s + lost_cpu_s). The values must equal the tally's.
-2. A leaf that passes (verdict "pass (ladder)" or "pass (extra rung)") gives d = 7 numbers. A leaf that still fails
-   after its extra rung gives none (PR3 section 5): its leaf row is reported instead. If only one basis passes, every
-   number below uses that basis alone, at d = 3, 5 and 7, and is labelled so. If neither passes, only the leaf rows
-   are reported.
+   A leaf that still failed after tau3 also gets its tau4 parts and the rules' values between tau3 and tau4 (10a),
+   recomputed here, which must equal r10_tau4_tally.json's, with the tau3 rebuild checks and the tau4 CPU.
+2. A leaf that passes (verdict "pass (ladder)", "pass (extra rung)" or, under 10a, "pass (tau4 rung)") gives d = 7
+   numbers. A leaf that still fails after its last rung, or whose tau4 did not finish or did not start, gives none
+   (PR3 section 5): its leaf row is reported instead. If only one basis passes, every number below uses that basis
+   alone, at d = 3, 5 and 7, and is labelled so. If neither passes, only the leaf rows are reported.
 3. Paired 2x2 tables (A wrong, ML(RL) wrong) at d = 7, r = 10, on the PR3 sample (the 25,000 decoded shots minus the
    1,000 probe shots: 24,000 per leaf). ML(RL)'s decisions are the ladder's final (tau2) decisions, as in round 1, K2
-   and PR3; the extra rung only checks convergence. A in: Libra (RL), Harmony (RL, SI1000), the shipped correlated
+   and PR3; the extra rung only checks convergence. Under 10a, a leaf that passes at the tau4 rung takes tau3's
+   decisions on its band shots and the ladder's elsewhere (tau4 checks tau3). A in: Libra (RL), Harmony (RL, SI1000), the shipped correlated
    matching (RL, SI1000), our corr. MWPM and MWPM (RL DEM). Tesseract has no d = 7 predictions and is left out.
    At d = 3 and 5, r = 10, the same tables from round 1's RL decode folders ("rl": all 50,000 shots, ML(RL) exact;
    "rl_s5": every 5th shot, ML(RL) the tau2 ladder), rebuilt with the frozen load_leaf() and count2(); the leaves rule
@@ -37,7 +43,8 @@ complete (a leaf without a final verdict) is refused.
    on the log scale. One-round values include SPAM spread over 10 rounds: comparable across d at r = 10, not with
    round 1's fitted per-round values.
 7. Checks: the parts cover the design's shots exactly and the sample has 24,000 shots per leaf; the recomputed rule
-   values equal the tally's; the sample's ML(RL) errors equal the tally's; every decoder has a prediction on every
+   values equal the tallies'; the sample's ML(RL) errors equal the tally's (tau2's, or tau3's for a leaf that passes at
+   the tau4 rung); the tau3 rebuild checks are identical in every tau4 part; every decoder has a prediction on every
    sample shot; round 1's rebuilt counts and eps_1pt equal the final analysis's for every leaf and decoder used; the
    pooled g and its frozen-formula SE equal the frozen pool_gap()'s on the same series; a shot bootstrap of each d = 7
    row (2,000 multinomial resamples of each leaf's 2x2 table, seed 20261013) gives an SD of g close to the SE.
@@ -45,7 +52,8 @@ Outputs: <out>/analysis/r10_results.json and .md; <out>/leaf_table/pr3_leaf_tabl
 table rows, unchanged, with the two r = 10 rows replaced by this run's). Exit 1 if a check fails.
 
   python3 -I -B pr3_r10_analyze.py --res results/decoder/willow/pr3/r10_posthoc \\
-      --ledger results/decoder/willow/pr3/r10_posthoc/logs/ledger.json --round1 results/decoder/willow \\
+      --ledger results/decoder/willow/pr3/r10_posthoc/logs/ledger.json \\
+      [--tau4-ledger results/decoder/willow/pr3/r10_posthoc/logs/tau4_ledger.json] --round1 results/decoder/willow \\
       --final-r1 results/decoder/willow/final_round1/final_round1.json \\
       --final-analysis results/decoder/willow/final_round1/analysis/analysis.json \\
       --pr3-leaf-table results/decoder/willow/pr3/leaf_table/pr3_leaf_table.json --out results/decoder/willow/pr3/r10_posthoc
@@ -183,8 +191,10 @@ def lam(e5, e7):
 
 
 # ---------------------------------------------------------------- the leaf rows (as pr3_leaf_table.py)
-def leaf_row(res, tag, design, lf, r, tv, units):
-    """One leaf's row with pr3_leaf_table.py's keys and formulas, and its checks against the tally's verdict."""
+def leaf_row(res, tag, design, lf, r, tv, units, t4=None, units4=None):
+    """One leaf's row with pr3_leaf_table.py's keys and formulas, and its checks against the tally's verdict. t4: the
+    leaf's r10_tau4_tally.json verdict, for a leaf that still failed after tau3 (amendment 10a); units4: the tau4
+    ledger's units."""
     checks = []
     nm = lf.split("/", 2)[-1]
     ldir = lambda j: os.path.join(res, "parts", f"p{j}", "decode", lf, tag)
@@ -310,13 +320,97 @@ def leaf_row(res, tag, design, lf, r, tv, units):
     want = "pass (ladder)" if lad["passes"] else (("pass (extra rung)" if row.get("tau2_tau3", {}).get("passes")
                                                    else "still fails: excluded and flagged") if Ed else None)
     checks.append({"what": f"{nm}: the verdict follows from the recomputed rules", "ok": want == tv.get("verdict")})
+    if t4 is not None:
+        tau4_rows(row, checks, res, tag, lf, nm, t4, units4 or {}, idx, obs, df, red, part_of, m, kf, edir)
     return row, checks
 
 
+def tau4_rows(row, checks, res, tag, lf, nm, t4, units4, idx, obs, df, red, part_of, m, kf, edir):
+    """Amendment 10a: the leaf's tau4 parts and the rules between tau3 and tau4, recomputed (as
+    pr3_r10_tau4.Tau4.rules) and checked against r10_tau4_tally.json."""
+    tdir = lambda j: os.path.join(res, "parts", f"p{j}", "tau4_rung", lf, tag)
+    row["verdict_after_tau3"] = row["verdict"]
+    row["verdict"] = t4.get("verdict")
+
+    def t4_done(j):                             # as pr3_r10_tau4.Tau4.done
+        try:
+            x = json.load(open(os.path.join(tdir(j), "tau4_rung.json")))
+        except Exception:
+            return False
+        return ("tau4" in x and x.get("first") is None
+                and x.get("extra_rung_npz_md5") == md5(os.path.join(edir(j), "extra_rung.npz")))
+    cpu4 = 0.0
+    for j in range(C.PARTS):
+        x = units4.get(f"tau4|{lf}|{j}")
+        ent = {"done": t4_done(j), "ledger_state": (x or {}).get("state", "never started")}
+        if x:
+            c = (x.get("cpu_s") or 0.0) + (x.get("lost_cpu_s") or 0.0)
+            ent.update(cpu_core_h=c / 3600, lost_cpu_core_h=(x.get("lost_cpu_s") or 0.0) / 3600, started=x.get("started"),
+                       ended=x.get("ended"), peak_rss_gib=(x.get("peak_rss") or 0) / 2 ** 30)
+            cpu4 += c
+        jp = os.path.join(tdir(j), "tau4_rung.json")
+        if os.path.exists(jp):
+            x4 = json.load(open(jp))
+            ck, s4 = x4.get("check", {}), x4.get("tau4", {})
+            ent.update(part_verdict=x4.get("verdict"), n_band=s4.get("n_band"), max_K_tau4=s4.get("max_K_tau4"),
+                       n_at_kmax_tau4=s4.get("n_at_kmax_tau4"), kmax=x4.get("kmax_t4"), nan_tau4=s4.get("nan_tau4"),
+                       ms_per_round_per_band_shot_tau4=s4.get("ms_per_round_per_band_shot_tau4"),
+                       tau3_rebuild_check={"n_checked": ck.get("n_checked"), "identical": ck.get("identical"),
+                                           "max_abs_llr_diff": ck.get("max_abs_llr_diff")})
+        row["parts"][f"p{j}"]["tau4"] = ent
+    D4 = [j for j in range(C.PARTS) if row["parts"][f"p{j}"]["tau4"]["done"]]
+    row["tau4_parts_done"] = D4
+    row["cpu_core_h"]["tau4"] = cpu4 / 3600
+    row["cpu_core_h"]["total"] += cpu4 / 3600
+    full = len(D4) == C.PARTS and len(row["extra_parts_done"]) == C.PARTS
+    if full:
+        pos = {int(x): i for i, x in enumerate(idx)}
+        bi, l3, l4, mk, kmax4 = [], [], [], [], None
+        for j in D4:
+            e = np.load(os.path.join(edir(j), "extra_rung.npz")); f = np.load(os.path.join(tdir(j), "tau4_rung.npz"))
+            assert np.array_equal(e["idx"], f["idx"]), f"{lf} p{j}: tau4's band shots differ from tau3's"
+            bj = np.array([pos[int(x)] for x in e["idx"]], np.int64)
+            assert np.array_equal(np.sort(bj), np.where(red & (part_of == j))[0]), f"{lf} p{j}: band shots differ"
+            bi.append(bj); l3.append(e["llr_t3"]); l4.append(f["llr_t4"]); mk.append(f["maxk_t4"])
+            kmax4 = json.load(open(os.path.join(tdir(j), "tau4_rung.json"))).get("kmax_t4")
+        cat = np.concatenate
+        bi, l3, l4, mk = cat(bi), cat(l3), cat(l4), cat(mk)
+        keep = m[bi]; bk = bi[keep]
+        d3, d4 = decide(l3), decide(l4)
+        base = kf - int(np.sum(df[bk] != obs[bk]))
+        k3, k4 = base + int(np.sum(d3[keep] != obs[bk])), base + int(np.sum(d4[keep] != obs[bk]))
+        ch4 = int(np.sum(d4[keep] != d3[keep])); nan4 = int(np.isnan(l4[keep]).sum())
+        lim4 = max(3, 0.01 * k4)
+        dP4 = np.abs(sigmoid(l4) - sigmoid(l3))[keep]
+        q = {"parts": D4, "complete": True, "band_shots_sample_covered": int(keep.sum()), "errors_tau3": k3,
+             "errors_tau4": k4, "abs_change_errors": abs(k4 - k3), "rule1": abs(k4 - k3) <= lim4, "decisions_changed": ch4,
+             "rule2prime": ch4 <= lim4 and nan4 == 0, "limit": lim4, "nan_tau4": nan4,
+             "max_abs_dP_descriptive": nanmax_or(dP4, None) if nan4 < dP4.size else None, "kmax": kmax4,
+             "band_shots_at_kmax_tau4": int(np.sum(mk[keep] >= kmax4)) if kmax4 else None}
+        q["passes"] = q["rule1"] and q["rule2prime"]
+        row["tau3_tau4"] = q
+        same = all(t4.get(k) == q[k] for k in ("errors_tau3", "errors_tau4", "decisions_changed", "nan_tau4", "rule1",
+                                                "rule2prime", "passes")) \
+            and abs(t4.get("limit", -1) - lim4) < 1e-9 \
+            and abs((t4.get("max_abs_dP_descriptive") or 0) - (q["max_abs_dP_descriptive"] or 0)) < 1e-12 \
+            and t4.get("band_shots_at_kmax_tau4") == q["band_shots_at_kmax_tau4"]
+        checks.append({"what": f"{nm}: tau3 -> tau4 values equal the tau4 tally's", "ok": bool(same)})
+        ex = row.get("tau2_tau3") or {}
+        checks.append({"what": f"{nm}: tau3's errors at the tau4 step equal the tau2 -> tau3 step's ({k3})",
+                       "ok": k3 == ex.get("errors_tau3")})
+        rc = [row["parts"][f"p{j}"]["tau4"].get("tau3_rebuild_check") or {} for j in D4]
+        checks.append({"what": f"{nm}: tau3 rebuild checks identical in all {len(rc)} tau4 parts",
+                       "ok": all(c.get("identical") is True for c in rc)})
+    want4 = (("pass (tau4 rung)" if row["tau3_tau4"]["passes"] else "still fails after tau4: excluded and flagged")
+             if full else "tau4 incomplete: leaf rows only")
+    checks.append({"what": f"{nm}: the tau4 verdict follows from the recomputed rules", "ok": want4 == t4.get("verdict")})
+
+
 # ---------------------------------------------------------------- d = 7, r = 10: this run's parts
-def load_d7(res, tag, lf, design, r=R):
-    """The leaf's 5 parts on the PR3 sample: obs, ML(RL) (the ladder's final decisions), the shipped decoders and our
-    corr. MWPM and MWPM (int8; -1 = no prediction)."""
+def load_d7(res, tag, lf, design, r=R, ml_tau3=False):
+    """The leaf's 5 parts on the PR3 sample: obs, ML(RL) (the ladder's final decisions; with ml_tau3, for a leaf that
+    passes at the tau4 rung under 10a, tau3's decisions on the band shots), the shipped decoders and our corr. MWPM and
+    MWPM (int8; -1 = no prediction)."""
     cols = {k: [] for k in ("idx", "obs", ML) + ENTS}
     want = []
     for j in range(C.PARTS):
@@ -329,7 +423,14 @@ def load_d7(res, tag, lf, design, r=R):
         assert np.array_equal(z["idx"], sh["idx"]), f"{d}: the ladder and shots.npz select different shots"
         n = len(sh["idx"])
         cols["idx"].append(sh["idx"].astype(np.int64)); cols["obs"].append(sh["obs"].astype(np.int8))
-        cols[ML].append(z["pred"][:, 0].astype(np.int8))
+        ml = z["pred"][:, 0].astype(np.int8)
+        if ml_tau3:
+            e = np.load(os.path.join(res, "parts", f"p{j}", "extra_rung", lf, tag, "extra_rung.npz"))
+            pos = {int(x): i for i, x in enumerate(z["idx"])}
+            bj = np.array([pos[int(x)] for x in e["idx"]], np.int64)
+            assert np.array_equal(np.sort(bj), np.where(z["redecoded"].astype(bool))[0]), f"{d}: tau3's shots differ from the band"
+            ml[bj] = decide(e["llr_t3"]).astype(np.int8)
+        cols[ML].append(ml)
         got = {}
         for nm, row in zip(sh["shipped_names"], sh["shipped"]):
             e = AW.shipped_entity(str(nm))
@@ -403,6 +504,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--res", required=True)
     ap.add_argument("--ledger", required=True)
+    ap.add_argument("--tau4-ledger", default=None, help="pr3_r10_tau4.py's tau4_ledger.json, if tau4 ran (10a)")
     ap.add_argument("--round1", required=True, help="results/decoder/willow (round 1's decode folders)")
     ap.add_argument("--final-r1", required=True)
     ap.add_argument("--final-analysis", required=True)
@@ -414,20 +516,37 @@ def main():
     T = json.load(open(tally_p))
     if not T.get("complete"):
         sys.exit("the r = 10 tally is not complete: every leaf needs a final verdict")
+    still = sorted(lf for lf, v in (T.get("verdicts") or {}).items() if str(v.get("verdict", "")).startswith("still fails"))
+    t4_p = os.path.join(a.res, "r10_tau4_tally.json")
+    T4 = json.load(open(t4_p)) if os.path.exists(t4_p) else None
+    if still and T4 is None:
+        sys.exit("a leaf still fails after tau3 and r10_tau4_tally.json does not exist: run pr3_r10_tau4.py first (10a)")
+    if T4 is not None and not T4.get("final"):
+        sys.exit(f"r10_tau4_tally.json is not final ({T4.get('status')})")
+    if T4 is not None and sorted(T4.get("failing_after_tau3") or []) != still:
+        sys.exit("r10_tau4_tally.json names other leaves than the ones that still fail in r10_tally.json")
     LG = json.load(open(a.ledger))
+    LG4 = json.load(open(a.tau4_ledger)) if a.tau4_ledger else {"units": {}}
     design = T["design"]; tag = f"rl_{design}"
-    units = LG["units"]
+    units, units4 = LG["units"], LG4["units"]
     o = {"made": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-         "what": ("PR3's post hoc r = 10 follow-up (willow_prereg_r3.md section 10): descriptive only, no test and no "
-                  "p-value; PR3's kill stands and H7 stays not evaluated"),
+         "what": ("PR3's post hoc r = 10 follow-up (willow_prereg_r3.md section 10, with amendment 10a): descriptive "
+                  "only, no test and no p-value; PR3's kill stands and H7 stays not evaluated"),
          "design": design, "tag": tag, "round": R,
          "tally": {k: T.get(k) for k in ("made", "status", "complete", "still_failing")},
+         "tau4": (None if T4 is None else {k: T4.get(k) for k in ("made", "status", "final", "failing_after_tau3",
+                                                                    "projection", "guard_core_h", "kmax_t4", "factor",
+                                                                    "tau4_cpu_core_h", "total_cpu_core_h")}),
          "inputs_md5": {"r10_tally.json": md5(tally_p), "ledger.json": md5(a.ledger), "final_round1.json": md5(a.final_r1),
                         "final_round1/analysis/analysis.json": md5(a.final_analysis),
                         "pr3_leaf_table.json": md5(a.pr3_leaf_table)},
          "code_md5": {"pr3_r10_analyze.py": md5(os.path.abspath(__file__)), "analyze_willow.py": md5(AW.__file__),
                       "p1_se_covariance.py": md5(PC.__file__), "pr3_common.py": md5(C.__file__)},
          "checks": [], "leaves": {}}
+    if T4 is not None:
+        o["inputs_md5"]["r10_tau4_tally.json"] = md5(t4_p)
+    if a.tau4_ledger:
+        o["inputs_md5"]["tau4_ledger.json"] = md5(a.tau4_ledger)
 
     def chk(what, ok):
         o["checks"].append({"what": what, "ok": bool(ok)})
@@ -437,17 +556,27 @@ def main():
     for b in C.BASES:
         lf = C.leaf(b, R)
         tv = (T.get("verdicts") or {}).get(lf, {})
-        row, cks = leaf_row(a.res, tag, design, lf, R, tv, units)
+        t4 = (T4.get("verdicts") or {}).get(lf) if (T4 is not None and lf in still) else None
+        row, cks = leaf_row(a.res, tag, design, lf, R, tv, units, t4, units4)
         o["checks"] += cks
         o["leaves"][lf] = row
-        if str(tv.get("verdict", "")).startswith("pass"):
+        if str(row["verdict"]).startswith("pass"):
             passing.append(b)
+    if T4 is not None and still:
+        tv4 = sum(o["leaves"][lf]["cpu_core_h"].get("tau4", 0.0) for lf in still)
+        chk(f"tau4 CPU from the tau4 ledger ({tv4:.4f} core-hours) equals the tau4 tally's",
+            abs(tv4 - (T4.get("tau4_cpu_core_h") or 0.0)) < 1e-9)
     o["passing_bases"] = passing
     tot = sum((x.get("cpu_s") or 0.0) + (x.get("lost_cpu_s") or 0.0) for x in units.values())
-    o["cpu"] = {"core_h": tot / 3600, "of_which_lost_core_h": sum(x.get("lost_cpu_s") or 0.0 for x in units.values()) / 3600,
-                "cap_core_h": T.get("guard_core_h"), "projection_at_exit": LG.get("projection")}
-    o["basis_rule"] = ("X and Z" if len(passing) == 2 else (f"{passing[0]} only: the other basis still fails after its "
-                       "extra rung and gives no number" if passing else "no leaf passes: leaf rows only"))
+    tot4 = sum((x.get("cpu_s") or 0.0) + (x.get("lost_cpu_s") or 0.0) for x in units4.values())
+    o["cpu"] = {"core_h": (tot + tot4) / 3600, "driver_core_h": tot / 3600, "tau4_core_h": tot4 / 3600,
+                "of_which_lost_core_h": (sum(x.get("lost_cpu_s") or 0.0 for x in units.values())
+                                         + sum(x.get("lost_cpu_s") or 0.0 for x in units4.values())) / 3600,
+                "cap_core_h": T.get("guard_core_h"), "projection_at_exit": LG.get("projection"),
+                "tau4_projection": (T4 or {}).get("projection")}
+    nopass = [f"{b}/r10 ({o['leaves'][C.leaf(b, R)]['verdict']})" for b in C.BASES if b not in passing]
+    o["basis_rule"] = ("X and Z" if len(passing) == 2 else (f"{passing[0]} only: " + "; ".join(nopass)
+                       + " gives no number" if passing else "no leaf passes: leaf rows only"))
 
     if passing:
         bases = tuple(passing)
@@ -455,12 +584,19 @@ def main():
         d7 = {}
         for b in bases:
             lf = C.leaf(b, R)
-            S, n_dec, n_s, cover = load_d7(a.res, tag, lf, design)
+            at4 = o["leaves"][lf]["verdict"] == "pass (tau4 rung)"
+            S, n_dec, n_s, cover = load_d7(a.res, tag, lf, design, ml_tau3=at4)
             chk(f"{b}/r10: the parts cover the design's shots exactly ({n_dec}); sample {n_s}",
                 cover and n_dec == 25000 and n_s == 24000)
             k_ml = int(np.sum(S[ML] != S["obs"]))
-            chk(f"{b}/r10: the sample's ML(RL) errors equal the tally's ({k_ml})", k_ml == T["verdicts"][lf]["ladder"]["errors_tau2"])
-            d7[b] = {"n_sample": n_s, "errors": {ML: k_ml}, "tables": {}}
+            if at4:
+                chk(f"{b}/r10: the sample's ML(RL) errors, tau3's on the band (10a), equal the tallies' ({k_ml})",
+                    k_ml == T["verdicts"][lf]["extra"]["errors_tau3"] == T4["verdicts"][lf]["errors_tau3"])
+            else:
+                chk(f"{b}/r10: the sample's ML(RL) errors equal the tally's ({k_ml})", k_ml == T["verdicts"][lf]["ladder"]["errors_tau2"])
+            d7[b] = {"n_sample": n_s, "errors": {ML: k_ml}, "tables": {},
+                     "ml_rl_decisions": ("tau3 on the band shots, the ladder elsewhere (amendment 10a)" if at4
+                                         else "the ladder's final (tau2)")}
             for e in ENTS:
                 c = AW.count2(S[e], S[ML], S["obs"])
                 chk(f"{b}/r10: {e} has a prediction on every sample shot", c["n"] == n_s)
@@ -570,10 +706,25 @@ def short(lf):
     return lf.split("/", 2)[-1]
 
 
-def rung_rows(n, lad, ex):
-    """The 'rules between rungs' rows of pr3_leaf_table.md for one leaf."""
+def rung_rows(n, lad, ex, q=None):
+    """The 'rules between rungs' rows of pr3_leaf_table.md for one leaf, with the tau3 -> tau4 row (10a) if q."""
     if not lad:
         return f"| {n} | – | no part ran | | | | | | |\n"
+    s = rung_rows_pr3(n, lad, ex)
+    if q:
+        dp = "–" if q["max_abs_dP_descriptive"] is None else format(q["max_abs_dP_descriptive"], ".3f")
+        s += (f"| {n} | τ3 → τ4 (10a) | {q['errors_tau3']} → {q['errors_tau4']} | {'pass' if q['rule1'] else 'fail'} | "
+              f"{q['decisions_changed']} / {q['limit']:.2f} | {'pass' if q['rule2prime'] else 'fail'} | {dp} | "
+              f"{q['nan_tau4']} | {q['band_shots_at_kmax_tau4']} of {q['band_shots_sample_covered']} |\n")
+    return s
+
+
+def cpu_cell(c):
+    return (f"{c['total']:.2f} ({c['ladder']:.2f} + {c['extra']:.2f}" + (f" + {c['tau4']:.2f}" if "tau4" in c else "")
+            + ")")
+
+
+def rung_rows_pr3(n, lad, ex):
     s = (f"| {n} | τ1 → τ2 | {lad['errors_tau1']} → {lad['errors_tau2']} | {'pass' if lad['rule1'] else 'fail'} | "
          f"{lad['decisions_changed']} / {lad['limit']:.2f} | {'pass' if lad['rule2prime'] else 'fail'} | "
          f"{lad['max_abs_dP_descriptive']:.3f} | {lad['nan_tau2']} | |\n")
@@ -593,7 +744,32 @@ def rung_rows(n, lad, ex):
 
 
 RUNG_HEAD = ("| leaf | rung | k (old → new) | rule 1 | decisions changed / limit | rule 2′ | max abs ΔP | NaN | "
-             "band shots at kmax (τ3) |\n|---|---|---|---|---|---|---|---|---|\n")
+             "band shots at kmax (new rung) |\n|---|---|---|---|---|---|---|---|---|\n")
+
+
+def tau4_md(o):
+    """The tau4 paragraph (amendment 10a)."""
+    t4 = o.get("tau4")
+    if not t4:
+        return ""
+    s = f"\n**τ4 rung (amendment 10a):** {t4['status']}."
+    P = t4.get("projection") or {}
+    if str(t4["status"]).startswith(("not started", "stopped")):
+        s += (f" Projection: {P.get('total_h', 0):.2f} core-hours in total (the driver's {P.get('driver_h', 0):.2f}, τ4 "
+              "used " + f"{P.get('tau4_used_h', 0):.2f}, τ4 to come " + f"{P.get('tau4_remaining_h', 0):.2f}; per leaf "
+              + ", ".join(f"{short(lf)} {h:.2f}" for lf, h in (P.get("per_leaf_h") or {}).items())
+              + f") against the cap of {t4['guard_core_h']}.")
+    s += "\n\n"
+    for lf, x in o["leaves"].items():
+        if "tau4_parts_done" in x:
+            rc = [x["parts"][f"p{j}"]["tau4"].get("tau3_rebuild_check") or {} for j in x["tau4_parts_done"]]
+            mk = [x["parts"][f"p{j}"]["tau4"].get("max_K_tau4") for j in x["tau4_parts_done"]]
+            s += (f"- {short(lf)}: after τ3, {x['verdict_after_tau3']}; after τ4, {x['verdict']}. τ4 parts done: "
+                  f"{len(x['tau4_parts_done'])} of 5. τ3 rebuild checks identical in "
+                  f"{sum(1 for c in rc if c.get('identical') is True)} of {len(rc)} parts"
+                  + (f"; largest τ4 term count {max(m for m in mk if m is not None)}" if any(m is not None for m in mk) else "")
+                  + f". τ4 CPU {x['cpu_core_h'].get('tau4', 0):.2f} core-hours.\n")
+    return s
 
 
 def write_md(o):
@@ -602,16 +778,17 @@ def write_md(o):
          "declared in `willow_prereg_r3.md` §10 before any r = 10 part started. **Post hoc and descriptive: no test and "
          "no p-value. PR3's kill stands, and H7 stays not evaluated.**\n\n"
          "## Leaf rows (PR3's rules, on the PR3 sample of 24,000 shots per leaf)\n\n"
-         "| leaf | verdict | band shots | CPU, core-hours (ladder + extra) |\n|---|---|---|---|\n")
+         "| leaf | verdict | band shots | CPU, core-hours (ladder + extra [+ τ4]) |\n|---|---|---|---|\n")
     for lf, x in o["leaves"].items():
         lad = x.get("tau1_tau2") or {}
-        s += (f"| {short(lf)} | {x['verdict']} | {lad.get('band_shots_sample', '–')} | {x['cpu_core_h']['total']:.2f} "
-              f"({x['cpu_core_h']['ladder']:.2f} + {x['cpu_core_h']['extra']:.2f}) |\n")
+        s += f"| {short(lf)} | {x['verdict']} | {lad.get('band_shots_sample', '–')} | {cpu_cell(x['cpu_core_h'])} |\n"
     s += "\n" + RUNG_HEAD
     for lf, x in o["leaves"].items():
-        s += rung_rows(short(lf), x.get("tau1_tau2"), x.get("tau2_tau3"))
+        s += rung_rows(short(lf), x.get("tau1_tau2"), x.get("tau2_tau3"), x.get("tau3_tau4"))
+    s += tau4_md(o)
     c = o["cpu"]
-    s += f"\nCPU of the follow-up: {c['core_h']:.2f} core-hours against the cap of {c['cap_core_h']}.\n\n"
+    s += (f"\nCPU of the follow-up: {c['core_h']:.2f} core-hours (the driver's {c['driver_core_h']:.2f} + τ4 "
+          f"{c['tau4_core_h']:.2f}) against the cap of {c['cap_core_h']}.\n\n")
     if not o["passing_bases"]:
         s += "**No r = 10 leaf passes, so no gap number is given (PR3 §5's rule).** The leaf rows above are the result.\n"
         return s + checks_md(o)
@@ -619,8 +796,12 @@ def write_md(o):
     if len(bases) == 1:
         s += (f"**Only {bases[0]}/r10 passes. Every number below uses the {bases[0]} basis alone, at d = 3, 5 and 7.** "
               "The other leaf gives no number; its row is above.\n\n")
-    s += ("## Error counts at d = 7, r = 10 (PR3 sample)\n\n| decoder | " + " | ".join(f"{b}/r10" for b in bases)
-          + " |\n|---|" + "---|" * len(bases) + "\n")
+    s += "## Error counts at d = 7, r = 10 (PR3 sample)\n\n"
+    for b in bases:
+        if o["d7_counts"][b].get("ml_rl_decisions", "").startswith("tau3"):
+            s += (f"ML(RL) at {b}/r10 takes τ3's decisions on the band shots and the ladder's elsewhere: the leaf passes "
+                  "at the τ4 rung (amendment 10a).\n\n")
+    s += ("| decoder | " + " | ".join(f"{b}/r10" for b in bases) + " |\n|---|" + "---|" * len(bases) + "\n")
     for e in (ML,) + ENTS:
         s += f"| {NICE[e]} | " + " | ".join(f"{o['d7_counts'][b]['errors'].get(e, '–')} of {o['d7_counts'][b]['n_sample']}"
                                             for b in bases) + " |\n"
@@ -678,23 +859,24 @@ def write_leaf_md(c):
          f"{c['pr3_leaf_table_md5']}), unchanged. The X/r10 and Z/r10 rows come from the post hoc r = 10 follow-up "
          "(`willow_prereg_r3.md` §10), run after PR3's kill with PR3's design, decoders and rules; the kill stands, and "
          "H7 stays not evaluated. Rules per leaf on the PR3 sample: rule 1, |k_new − k_old| ≤ max(3, 1% of k_new); "
-         "rule 2′, decisions changed ≤ the same limit. |ΔP| is descriptive.\n\n"
-         "## Verdicts, parts and CPU\n\n| leaf | source | verdict | ladder parts done | extra parts done | band shots | "
-         "CPU, core-hours (ladder + extra) |\n|---|---|---|---|---|---|---|\n")
+         "rule 2′, decisions changed ≤ the same limit. |ΔP| is descriptive. Under amendment 10a, an r = 10 leaf that "
+         "still failed after τ3 got one more rung, τ4 = 1e-9, with the same rules between τ3 and τ4.\n\n"
+         "## Verdicts, parts and CPU\n\n| leaf | source | verdict | ladder parts done | extra parts done | τ4 parts done | "
+         "band shots | CPU, core-hours (ladder + extra [+ τ4]) |\n|---|---|---|---|---|---|---|---|\n")
     for lf in sorted(c["leaves"]):
         x = c["leaves"][lf]
         lad = x.get("tau1_tau2") or {}
+        t4d = (f"{len(x['tau4_parts_done'])} of 5 {x['tau4_parts_done'] or ''}" if "tau4_parts_done" in x else "–")
         s += (f"| {short(lf)} | {'post hoc' if x['source'].startswith('post hoc') else 'PR3'} | {x['verdict']} | "
               f"{len(x['ladder_parts_done'])} of 5 {x['ladder_parts_done'] or ''} | {len(x['extra_parts_done'])} of 5 "
-              f"{x['extra_parts_done'] or ''} | {lad.get('band_shots_sample', '–')} | {x['cpu_core_h']['total']:.2f} "
-              f"({x['cpu_core_h']['ladder']:.2f} + {x['cpu_core_h']['extra']:.2f}) |\n")
+              f"{x['extra_parts_done'] or ''} | {t4d} | {lad.get('band_shots_sample', '–')} | {cpu_cell(x['cpu_core_h'])} |\n")
     t, r = c["pr3_totals"], c["r10_cpu"]
     s += (f"\nPR3's main run: {t['cpu_core_h']:.2f} core-hours against its {t['guard_core_h']} guard. The r = 10 "
-          f"follow-up: {r['core_h']:.2f} core-hours against its cap of {r['cap_core_h']}.\n\n## Rules between rungs\n\n"
-          + RUNG_HEAD)
+          f"follow-up: {r['core_h']:.2f} core-hours (the driver's {r['driver_core_h']:.2f} + τ4 {r['tau4_core_h']:.2f}) "
+          f"against its cap of {r['cap_core_h']}.\n\n## Rules between rungs\n\n" + RUNG_HEAD)
     for lf in sorted(c["leaves"]):
         x = c["leaves"][lf]
-        s += rung_rows(short(lf), x.get("tau1_tau2"), x.get("tau2_tau3"))
+        s += rung_rows(short(lf), x.get("tau1_tau2"), x.get("tau2_tau3"), x.get("tau3_tau4"))
     for lf in sorted(c["leaves"]):
         ex = c["leaves"][lf].get("tau2_tau3") or {}
         if ex and not ex["complete"]:
