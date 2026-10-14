@@ -14,7 +14,7 @@ It runs no decoder. From the stored result files alone it re-derives what the te
   L2  redraws Figs. 1, 2 and S1 with scout's figure scripts (Fig. 2 from the L1 output) and Figs. 3, 4, S2 and S3
       with decoder's figures() (code/decoder/analyze_willow.py, imported read-only) from the stored analysis, and
       compares each with the draft's PNG pixel by pixel and byte by byte (the shared folder's caBX chunk removed).
-  L3  regenerates the numbers of Tables 2-5 (main text) and S7-S8 (supplement): every number in a table cell must
+  L3  regenerates the numbers of Tables 2-5 (main text) and S7, S8 and S20 (supplement): every number in a table cell must
       equal, at the precision printed, a value under the result-file keys that the row's specification names.
   L4  checks every number of the ledger (numbers.md) against the file and key that its row cites, in the L1
       outputs (scout's derived files) or in the stored result files (decoder's and reservoir's).
@@ -327,6 +327,8 @@ KEYMAP = {
     "R3": ["results/reservoir/willow_revision/r3_patch.json"], "R5": ["results/reservoir/willow_revision/r5_worstcase.json"],
     "R1C": ["results/reservoir/willow_revision/r1_phase1/r1_certificate.json"],
     "R1P": ["results/reservoir/willow_revision/r1_phase1/r1_posthoc.json"],
+    "R2A": ["results/reservoir/willow_revision/r12_final/r2_analysis.json"],
+    "R12C": ["results/reservoir/willow_revision/r12_final/r1_certificate.json"],
     # scout: regenerated in L1
     "K2F": ["results/scout/willow_k2_summary.json"], "SDF": ["results/scout/willow_derived_final.json"],
     "GRF": ["results/scout/willow_growth_re_final.json"], "OBF": ["results/scout/willow_outside_band_share_final.json"],
@@ -979,6 +981,15 @@ TABLES = [
                        ("R3", "decoders>tesseract>ruleA>table7")]),
         ("NN (reported)", None),
     ]),
+    ("supplement", "Table S20.", [0], [
+        ("exact MPE, d = 3", [("R2A", "concordance>mpe_tau|10_30|d3|ruleA")]),
+        ("MPE_τ, d = 5", [("R2A", "concordance>mpe_tau|10_30|d5|ruleA")]),
+        ("Tesseract, d = 5", [("R2A", "concordance>tesseract|10_30|d5|ruleA")]),
+        ("Harmony, d = 5", [("R2A", "concordance_reference>harmony|10_30|d5|ruleA")]),
+        ("corr. matching, d = 5", [("R2A", "concordance_reference>corrmatch|10_30|d5|ruleA")]),
+        ("corr. MWPM, ours, d = 5", [("R2A", "concordance_reference>corr_mwpm|10_30|d5|ruleA")]),
+        ("MWPM, ours, d = 5", [("R2A", "concordance_reference>mwpm|10_30|d5|ruleA")]),
+    ]),
 ]
 
 
@@ -1270,6 +1281,22 @@ DERIVED = {
     "D20": [("SDF calibration_R_by_distance.d5_W5.R (the pooled R at d = 5)", lambda g: g.one("SDF", "calibration_R_by_distance>d5_W5>R"))],
     "R47": [("FA pooled_counts.d5|libra.rl vs ML.rl: errors_A / (1.01 errors_B) - 1",
              lambda g: g.one("FA", "pooled_counts>d5|libra.rl vs ML.rl>errors_A") / (1.01 * g.one("FA", "pooled_counts>d5|libra.rl vs ML.rl>errors_B")) - 1)],
+    "V44": [("R2A mpe_tau_vs_tesseract.resolved: resolved, summed over r",
+             lambda g: sum(g.all("R2A", "mpe_tau_vs_tesseract>resolved>*>resolved"))),
+            ("R2A mpe_tau_vs_tesseract.resolved: proven, summed over r",
+             lambda g: sum(g.all("R2A", "mpe_tau_vs_tesseract>resolved>*>proven"))),
+            ("R2A merges: the number of DEMs recorded", lambda g: float(len(g.src.load(KEYMAP["R2A"][0])["merges"])))],
+    "V45": ([("R2A mpe_tau_vs_tesseract: the class differs, summed over r",
+              lambda g: sum(g.all("R2A", "mpe_tau_vs_tesseract>*>class_differs"))),
+             ("R2A mpe_tau_vs_tesseract: the shots, summed over r", lambda g: sum(g.all("R2A", "mpe_tau_vs_tesseract>*>shots"))),
+             ("R2A mpe_tau_vs_tesseract: the class differs / the shots, summed over r",
+              lambda g: sum(g.all("R2A", "mpe_tau_vs_tesseract>*>class_differs")) / sum(g.all("R2A", "mpe_tau_vs_tesseract>*>shots")))]
+            + [("R2A mpe_tau_vs_tesseract.%s: class_differs / shots" % r,
+                (lambda r: lambda g: g.one("R2A", "mpe_tau_vs_tesseract>%s>class_differs" % r)
+                 / g.one("R2A", "mpe_tau_vs_tesseract>%s>shots" % r))(r)) for r in ("r10", "r13", "r30")]),
+    "V46": [("R2A factor: the largest |lambda_ratio(mpe_tau) - lambda_ratio(tesseract)| over the four windows and rules",
+             lambda g: max(abs(g.one("R2A", "factor>mpe_tau|%s>lambda_ratio" % w) - g.one("R2A", "factor>tesseract|%s>lambda_ratio" % w))
+                           for w in ("10_13_30|ruleA", "10_13_30|no_exclusion", "10_30|ruleA", "10_30|no_exclusion")))],
     "4a: P1's SE raised": [("SEC full_delta_method_inflated.se / AM3 P1_libra_vs_ML_rl_d3.pooled.se_rel - 1",
                            lambda g: g.one("SEC", "full_delta_method_inflated>se") / g.one("AM3", "P1_libra_vs_ML_rl_d3>pooled>se_rel") - 1)],
 }
@@ -1318,7 +1345,7 @@ def check_ledger(src, ledger_text, results):
                 if tk.kind == "context":
                     results.append(("L4", "context", rname, tk.text))
                     continue
-                st, det = (cands.match(tk) if cands else (None, ""))
+                st, det = (cands.match(tk, allow_file=False, allow_text=False) if cands else (None, ""))
                 if st != "PASS":
                     for val, desc in derived_for(getter, rname):
                         if val is None:
@@ -1329,6 +1356,10 @@ def check_ledger(src, ledger_text, results):
                                 break
                         if st == "PASS":
                             break
+                if st != "PASS" and cands:
+                    st2, det2 = cands.match(tk)
+                    if st2 == "PASS" or st is None:
+                        st, det = st2, det2
                 if st is None:
                     if not specs:
                         st, det = "NOT COVERED", "no result file cited" + (" (reported)" if lit else "")
@@ -1522,7 +1553,7 @@ def main():
         layer2(root, out, a.draft, regen_dir, results, reads)
     src = Sources(root, regen_dir)
     if "L3" not in skip:
-        say("\n== L3: Tables 2-5 (main text) and S7-S8 (supplement)")
+        say("\n== L3: Tables 2-5 (main text) and S7, S8 and S20 (supplement)")
         check_tables(src, a.draft, results)
     if "L4" not in skip:
         say("\n== L4: the ledger (%s), row by row" % (a.ledger or os.path.join(a.draft, "numbers.md")))
