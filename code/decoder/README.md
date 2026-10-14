@@ -208,6 +208,10 @@ Scripts:
   - `a1r2_project.py` (A1-R2-P): a planning projection, not a result, and not for the paper. It reads no new
     decoding. It first reproduces `a1r2_results.json`'s primary numbers. It then recomputes the box with
     r = 30 C00 set to the design's 1,556 shots, under assumed flip counts.
+  - `a1r2x_analyze.py` (A1-R2-X): a post hoc, descriptive addendum from stored outputs; no decoding. At A1-R2's box
+    vertices it gives Libra's g_5 with its own shot-noise CI and the growth Delta. It then applies the same box of
+    ML flip rates to the other decoders' paired gaps (Harmony, correlated matching, our correlated MWPM and MWPM on
+    {10, 30, 50}; Tesseract on {10, 30}), with the declared reading. Output: `revision/a1r2/a1r2x_results.json`.
 - `rev_d1_labels.py` (D1-5b, D1-5c): the declared reporting labels of D1's result. It replays `rev_d1_analyze.py` on
   the same inputs and seeds, and stops unless the replay reproduces `d1_results.json`. It records each posterior
   draw's count gap and its shot-noise SE. It then labels the result per cell and under the pooled reading, for rules
