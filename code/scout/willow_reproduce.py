@@ -14,7 +14,7 @@ It runs no decoder. From the stored result files alone it re-derives what the te
   L2  redraws Figs. 1, 2 and S1 with scout's figure scripts (Fig. 2 from the L1 output) and Figs. 3, 4, S2 and S3
       with decoder's figures() (code/decoder/analyze_willow.py, imported read-only) from the stored analysis, and
       compares each with the draft's PNG pixel by pixel and byte by byte (the shared folder's caBX chunk removed).
-  L3  regenerates the numbers of Tables 2-5 (main text) and S7, S8 and S20 (supplement): every number in a table cell must
+  L3  regenerates the numbers of Tables 2-5 (main text) and S7, S8, S20 and S22 (supplement): every number in a table cell must
       equal, at the precision printed, a value under the result-file keys that the row's specification names.
   L4  checks every number of the ledger (numbers.md) against the file and key that its row cites, in the L1
       outputs (scout's derived files) or in the stored result files (decoder's and reservoir's).
@@ -308,7 +308,7 @@ KEYMAP = {
     "D2": [W + "revision/d2_worstcase/d2_worstcase.json"],
     "D3R13": [W + "revision/d3_facts/d3_r13_census.json"], "D3D7": [W + "revision/d3_facts/d3_d7r13_census.json"],
     "D3F": [W + "revision/d3_facts/d3_facts.json", W + "revision/d3_facts/d3_facts.md"], "REP": ["code/decoder/willow_reported.json"],
-    "A1R2": [W + "revision/a1r2/a1r2_results.json"],
+    "A1R2": [W + "revision/a1r2/a1r2_results.json"], "A1R2X": [W + "revision/a1r2/a1r2x_results.json"],
     # reservoir
     "GTF": ["results/reservoir/willow_gapmech/final_k2/gap_table.json", "results/reservoir/willow_gapmech/final_k2/gap_series.csv"],
     "EAF": ["results/reservoir/willow_gapmech/final_k2/exact_analysis.json"],
@@ -920,7 +920,7 @@ TABLES = [
         ("census, no exclusion", [("V2D3", "census_growth>none")]),
         ("census, flip rates per round count", [("V2D3", "census_growth>C_only|*|A")]),
         ("census, how the strata", [("V2D3", "census_growth>A")]),
-        ("targeted check of the per-round floor", [("A1R2", "primary"), ("V2D3", "g3_W5", "growth")]),
+        ("targeted check of the per-round floor", [("A1R2", "primary"), ("A1R2X", "libra"), ("V2D3", "g3_W5", "growth")]),
         ("independent contraction", []),
     ]),
     ("manuscript", "Table 5.", [0, 1], [
@@ -989,6 +989,14 @@ TABLES = [
         ("corr. matching, d = 5", [("R2A", "concordance_reference>corrmatch|10_30|d5|ruleA")]),
         ("corr. MWPM, ours, d = 5", [("R2A", "concordance_reference>corr_mwpm|10_30|d5|ruleA")]),
         ("MWPM, ours, d = 5", [("R2A", "concordance_reference>mwpm|10_30|d5|ruleA")]),
+    ]),
+    ("supplement", "Table S22.", [0], [
+        ("Libra", [("A1R2X", "decoders>libra")]),
+        ("Harmony", [("A1R2X", "decoders>harmony")]),
+        ("corr. matching", [("A1R2X", "decoders>corrmatch")]),
+        ("corr. MWPM", [("A1R2X", "decoders>corr_mwpm")]),
+        ("MWPM", [("A1R2X", "decoders>mwpm")]),
+        ("Tesseract", [("A1R2X", "decoders>tesseract")]),
     ]),
 ]
 
@@ -1297,6 +1305,11 @@ DERIVED = {
     "V46": [("R2A factor: the largest |lambda_ratio(mpe_tau) - lambda_ratio(tesseract)| over the four windows and rules",
              lambda g: max(abs(g.one("R2A", "factor>mpe_tau|%s>lambda_ratio" % w) - g.one("R2A", "factor>tesseract|%s>lambda_ratio" % w))
                            for w in ("10_13_30|ruleA", "10_13_30|no_exclusion", "10_30|ruleA", "10_30|no_exclusion")))],
+    "V55": [("R2A mpe_tau_vs_tesseract.r%d: class_differs / shots / %d (per shot and per round)" % (r, r),
+             (lambda r: lambda g: g.one("R2A", "mpe_tau_vs_tesseract>r%d>class_differs" % r)
+              / g.one("R2A", "mpe_tau_vs_tesseract>r%d>shots" % r) / r)(r)) for r in (10, 13, 30)]
+            + [("R2A mpe_tau_vs_tesseract: the class differs, summed over r (V45's 186)",
+                lambda g: sum(g.all("R2A", "mpe_tau_vs_tesseract>*>class_differs")))],
     "4a: P1's SE raised": [("SEC full_delta_method_inflated.se / AM3 P1_libra_vs_ML_rl_d3.pooled.se_rel - 1",
                            lambda g: g.one("SEC", "full_delta_method_inflated>se") / g.one("AM3", "P1_libra_vs_ML_rl_d3>pooled>se_rel") - 1)],
 }
@@ -1476,11 +1489,21 @@ def write_manifest(root, out, reads, parent_reads, path):
     outabs = os.path.abspath(out)
     # the published copy of this manifest, which the ledger cites: a manifest cannot list its own md5
     selfpath = os.path.join(rootabs, DRAFT, "reproduce_inputs.md")
-    rows = []
+    rows, unseen = [], []
     for p, users in files.items():
         if not p.startswith(rootabs + "/") or p.startswith(outabs + "/") or p == THIS or p == selfpath:
             continue
-        if not os.path.isfile(p) or "/__pycache__/" in p:
+        if "/__pycache__/" in p:
+            continue
+        found = os.path.isfile(p)
+        for _ in range(3):  # the shared folder can fail a lookup for a moment; retry before giving up
+            if found or os.path.isdir(p):
+                break
+            time.sleep(2)
+            found = os.path.isfile(p)
+        if not found:
+            if not os.path.isdir(p):
+                unseen.append((os.path.relpath(p, rootabs), ", ".join(sorted(users))))
             continue
         rel = os.path.relpath(p, rootabs)
         rows.append((rel, os.path.getsize(p), md5_file(p), ", ".join(sorted(users))))
@@ -1503,6 +1526,12 @@ def write_manifest(root, out, reads, parent_reads, path):
     L += ["", "## Code (%d files)" % (len(code) + 1), "", "| path | bytes | md5 | read by |", "|---|---|---|---|"]
     L += ["| `code/scout/willow_reproduce.py` | %d | %s | the entry point |" % (os.path.getsize(THIS), md5_file(THIS))]
     L += ["| `%s` | %d | %s | %s |" % r for r in code]
+    if unseen:
+        L += ["", "## Read during the run but not found when this manifest was written (%d)" % len(unseen), "",
+              "| path | read by |", "|---|---|"]
+        L += ["| `%s` | %s |" % r for r in sorted(unseen)]
+        say("WARNING manifest: %d recorded reads not found when the manifest was written: %s"
+            % (len(unseen), ", ".join(r[0] for r in sorted(unseen))))
     with open(path, "w") as f:
         f.write("\n".join(L) + "\n")
     return len(data), len(code)
@@ -1553,7 +1582,7 @@ def main():
         layer2(root, out, a.draft, regen_dir, results, reads)
     src = Sources(root, regen_dir)
     if "L3" not in skip:
-        say("\n== L3: Tables 2-5 (main text) and S7, S8 and S20 (supplement)")
+        say("\n== L3: Tables 2-5 (main text) and S7, S8, S20 and S22 (supplement)")
         check_tables(src, a.draft, results)
     if "L4" not in skip:
         say("\n== L4: the ledger (%s), row by row" % (a.ledger or os.path.join(a.draft, "numbers.md")))
