@@ -217,6 +217,14 @@ Scripts:
   draw's count gap and its shot-noise SE. It then labels the result per cell and under the pooled reading, for rules
   A and none (contradiction first; then partial, disagreement, agreement or inconclusive). It also gives the
   per-stratum agreement with exact 95% bounds.
+- `rev_d1_byround.py` (D1-6, D1-6b): D1's counts by round count, descriptively, from `d1_results.json` alone. Per r
+  and stratum: MPS against the paper's decision and against the census decision, and the sparse ladder's tau2 and
+  tau3 flips against the paper's decision, each with exact 95% bounds, plus population-weighted rates per r. It
+  recounts from the per-shot records and stops unless the analysis's own tables agree.
+- `run_logged.sh` (D1-4): a short bash wrapper. It runs a command with its output appended to a log, and adds a
+  `date -u` line with its PID before the command starts and after it ends, with the exit code. It does nothing else.
+  D1-4 used it to resume D1's MPS workers detached (`setsid nohup`) on 2026-10-23. The shared folder does not keep
+  the executable bit, so the launch ran an identical local copy (same md5).
 
 **Stages and cost** (`python3 -I -B willow_stage.py estimate`; the layout the fetch session read from the zip's central
 directory: 9 / 4 / 1 patches at d = 3 / 5 / 7, X and Z, 15 round counts 1, 10, 13, 30, 50, 70, ..., 250, 50,000 shots per
