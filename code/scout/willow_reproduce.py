@@ -44,7 +44,9 @@ Scout, 2026-10-13; post hoc tooling, no new analysis. Draft 9 (2026-10-24): D1's
 [D1B] and their reports) and Tables S20 and S21 added; the supplement's Tables S20 and S22 of draft 8.1 are now
 S22 and S24; the audit hooks no longer call os.getcwd() on each open, and the MANIFEST check is new. Draft 9.1
 (2026-10-24): decoder's D1-8 projection ([DPJ], [DPJM]) added; L3 checks Table 4's pooled median and Table S20's
-posterior medians; L4 registers the arithmetic of ledger rows V97, V98 and V100-V102.
+posterior medians; L4 registers the arithmetic of ledger rows V97, V98 and V100-V102. Draft 9.1, corrected
+(9.1b): decoder's D1-8c to D1-8f ([DPD], [DPDM], [DPR], [DPRM]) and scout's compute record ([SCPU], [SCPUM])
+added; L4 registers the arithmetic of rows V107-V109 and of S11's new total (V93, V94).
 """
 import argparse
 import csv
@@ -335,6 +337,11 @@ KEYMAP = {
     # D1-8 (draft 9.1): the post hoc projection of the sample that would make D1's primary reading decisive
     "DPJ": [W + "revision/d1_mps/projection/d1_projection.json"],
     "DPJM": [W + "revision/d1_mps/projection/d1_projection.md"],
+    # D1-8c to D1-8f (draft 9.1b): designs that narrow D1's primary interval, without and with the one-disagreement test
+    "DPD": [W + "revision/d1_mps/projection/d1_design.json"],
+    "DPDM": [W + "revision/d1_mps/projection/d1_design.md"],
+    "DPR": [W + "revision/d1_mps/projection/d1_design_robust.json"],
+    "DPRM": [W + "revision/d1_mps/projection/d1_design_robust.md"],
     # reservoir
     "GTF": ["results/reservoir/willow_gapmech/final_k2/gap_table.json", "results/reservoir/willow_gapmech/final_k2/gap_series.csv"],
     "EAF": ["results/reservoir/willow_gapmech/final_k2/exact_analysis.json"],
@@ -364,6 +371,8 @@ KEYMAP = {
     # scout: records of earlier states (stored, not regenerated)
     "SD": ["results/scout/willow_derived_d3d5.json"], "GR": ["results/scout/willow_growth_re.json"],
     "OB": ["results/scout/willow_outside_band_share.json"],
+    # scout: its compute since 22:54Z on 23 October (draft 9.1b; S11)
+    "SCPU": ["results/scout/revision/compute/scout_cpu.json"], "SCPUM": ["results/scout/revision/compute/scout_cpu.md"],
     # texts: notes, boards, plans
     "PP": ["notes/decoder/willow_prereg.md"], "PR2": ["notes/decoder/willow_prereg_r2.md"],
     "PR3": ["notes/decoder/willow_prereg_r3.md"], "plan": ["notes/decoder/willow_final_analysis_plan.md"],
@@ -1568,6 +1577,50 @@ DERIVED.update({
               lambda g: sum(_dpj(g, "(c) adverse sides, +250")["cost_core_hours"].values())),
              ("DPJ scenarios '(c) adverse sides, +50': cost_core_hours mps + sparse",
               lambda g: sum(_dpj(g, "(c) adverse sides, +50")["cost_core_hours"].values()))],
+})
+
+
+# draft 9.1, corrected (9.1b): main's rule (row V107), the projections' compute (V108) and scout's compute in
+# S11's total (V93, V94, V109)
+def _headline_width(g):
+    """The headline's width, from D1-8e's design of 6 core-hours: its synthetic width over that width's multiple
+    of the headline's."""
+    s = g.src.load(KEYMAP["DPR"][0])["designs"][6]["synthetic"]
+    return s["A_cells_width"] / s["A_cells_width_x_headline"]
+
+
+def _proj_compute(g):
+    """D1-8's compute (decoder's post of 11:26:06Z) and D1-8c's and D1-8e's (12:14:56Z), in core-hours."""
+    return (_post_num(g, "DB", "11:26:06Z", r"\*\*Compute\*\* \[measured\]\. (\d+\.\d+) core-hours")
+            + _post_num(g, "DB", "12:14:56Z", r"so (\d+\.\d+) in all"))
+
+
+def _scout_line_91b(g):
+    """S11's line for the text's builds and checks and the entry point's runs: draft 9's 0.66 (decoder's post of
+    08:00:43Z) and scout's compute since 22:54Z on 23 October ([SCPU])."""
+    return (_post_num(g, "DB", "08:00:43Z", r"scout and main \[estimate\][^|]*\| (\d+\.\d+)")
+            + g.one("SCPU", "since_cutoff>core_hours"))
+
+
+def _rev_total_91b(g):
+    """S11's total after draft 9.1b: draft 9's, with scout's compute since 22:54Z on 23 October added."""
+    return _rev_total(g) + g.one("SCPU", "since_cutoff>core_hours")
+
+
+_D91B_LINE = ("S11's scout line, draft 9.1b: 0.66 + scout's compute since 22:54Z on 23 October ([SCPU])", _scout_line_91b)
+_D91B_TOTAL = ("S11's total, draft 9.1b: draft 9's + scout's compute since 22:54Z on 23 October ([SCPU])", _rev_total_91b)
+_D91B_PROJ = ("DB 11:26:06Z (D1-8) + DB 12:14:56Z (D1-8c and D1-8e): the projections' compute", _proj_compute)
+# (V93 and V94 take scout's compute from here rather than citing [SCPU], whose other values would meet their
+# numbers by chance)
+_D91B_Y = ("SCPU since_cutoff.core_hours: scout's compute since 22:54Z on 23 October",
+           lambda g: g.one("SCPU", "since_cutoff>core_hours"))
+DERIVED.update({
+    "V107": [("DPR designs.6.synthetic: A_cells_width / A_cells_width_x_headline, the headline's width", _headline_width),
+             ("twice the headline's width, main's bound", lambda g: 2 * _headline_width(g))],
+    "V108": [_D91B_PROJ],
+    "V109": [_D91B_LINE, _D91B_TOTAL, ("S11's total, draft 9.1", _rev_total)],
+    "V93": DERIVED["V93"] + [_D91B_TOTAL, _D91B_LINE, _D91B_PROJ, _D91B_Y],
+    "V94": [_D91B_LINE, _D91B_PROJ, _D91B_Y],
 })
 
 
