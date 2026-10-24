@@ -46,7 +46,9 @@ S22 and S24; the audit hooks no longer call os.getcwd() on each open, and the MA
 (2026-10-24): decoder's D1-8 projection ([DPJ], [DPJM]) added; L3 checks Table 4's pooled median and Table S20's
 posterior medians; L4 registers the arithmetic of ledger rows V97, V98 and V100-V102. Draft 9.1, corrected
 (9.1b): decoder's D1-8c to D1-8f ([DPD], [DPDM], [DPR], [DPRM]) and scout's compute record ([SCPU], [SCPUM])
-added; L4 registers the arithmetic of rows V107-V109 and of S11's new total (V93, V94).
+added; L4 registers the arithmetic of rows V107-V109 and of S11's new total (V93, V94). Draft 9.2
+(2026-10-24): decoder's D1-9, the one-off extension of D1 ([D1XR], [D1XL], [D1XM], [D1XS], [D1XD]), added; L3
+checks Table 4's and Table S20's rows for D1 u D1-9 beside D1's; L4 registers the arithmetic of rows V110-V119.
 """
 import argparse
 import csv
@@ -342,6 +344,12 @@ KEYMAP = {
     "DPDM": [W + "revision/d1_mps/projection/d1_design.md"],
     "DPR": [W + "revision/d1_mps/projection/d1_design_robust.json"],
     "DPRM": [W + "revision/d1_mps/projection/d1_design_robust.md"],
+    # D1-9 (draft 9.2): the one-off extension of D1; its analysis and labels cover D1 u D1-9
+    "D1XR": [W + "revision/d1_mps/extension/analysis/d1_results.json"],
+    "D1XL": [W + "revision/d1_mps/extension/analysis/d1_labels.json"],
+    "D1XM": [W + "revision/d1_mps/extension/analysis/d1_results.md"],
+    "D1XS": [W + "revision/d1_mps/extension/selection/sample.json"],
+    "D1XD": [W + "revision/d1_mps/extension/selection/design.json"],
     # reservoir
     "GTF": ["results/reservoir/willow_gapmech/final_k2/gap_table.json", "results/reservoir/willow_gapmech/final_k2/gap_series.csv"],
     "EAF": ["results/reservoir/willow_gapmech/final_k2/exact_analysis.json"],
@@ -912,13 +920,14 @@ def _t3_row(dec, d3=None, d5=None):
             ("R3", "decoders>%s>ruleA>table7" % dec)] + (d3 or []) + (d5 or [])
 
 
-def _s20_row(rule, rd):
+def _s20_row(rule, rd, ext=False):
     """Table S20's row: the labels' values, and (draft 9.1) the posterior medians, of g5 with shot noise and of the
-    correction alone (its median less the paper's g5)."""
+    correction alone (its median less the paper's g5); draft 9.2: D1 u D1-9's rows (ext) from [D1XL] and [D1XR]."""
     var = "posterior_diff_cells" if rd == "cells" else "posterior_diff_pooled"
-    return [("D1L", "labels>%s|%s" % (rule, rd)),
-            ("D1R", "rules>%s>%s>g5_with_shot_noise_q025_q50_q975>1" % (rule, var), "posterior median"),
-            ("COMPUTED", "d1_corr_median_%s|%s" % (rule, rd), "", "posterior median")]
+    lk, rk, ck = ("D1XL", "D1XR", "d1x_corr_median") if ext else ("D1L", "D1R", "d1_corr_median")
+    return [(lk, "labels>%s|%s" % (rule, rd)),
+            (rk, "rules>%s>%s>g5_with_shot_noise_q025_q50_q975>1" % (rule, var), "posterior median"),
+            ("COMPUTED", "%s_%s|%s" % (ck, rule, rd), "", "posterior median")]
 
 
 TABLES = [
@@ -968,10 +977,19 @@ TABLES = [
         ("targeted check of the per-round floor", [("A1R2", "primary"), ("A1R2X", "libra"), ("V2D3", "g3_W5", "growth")]),
         # D1 (draft 9): the contraction's row; its intervals are the labels' posterior intervals with shot noise
         # draft 9.1: the pooled posterior's quantiles first, so that its median is matched at its own key
-        ("independent contraction", [("D1R", "rules>A>posterior_diff_pooled>g5_with_shot_noise_q025_q50_q975", "g₅"),
+        # draft 9.2: D1 u D1-9 (with the post hoc extension D1-9) first, then D1's first sample alone
+        ("independent contraction with its extension", [
+            ("D1XR", "rules>A>posterior_diff_pooled>g5_with_shot_noise_q025_q50_q975", "g₅"),
+            ("D1XL", "labels>A|cells", "g₅"), ("D1XL", "labels>A|pooled", "g₅"),
+            ("D1XL", "labels>A|cells", "count gap"), ("D1XL", "labels>A|pooled", "count gap"),
+            ("D1XR", "rules>A>estimate_diff>count_gap", "count gap"),
+            ("COMPUTED", "d1x_corr_median_A|cells", "", "g₅"), ("COMPUTED", "d1x_corr_median_A|pooled", "", "g₅"),
+            ("COMPUTED", "d1x_delta", "", "growth")]),
+        ("independent contraction, first sample", [("D1R", "rules>A>posterior_diff_pooled>g5_with_shot_noise_q025_q50_q975", "g₅"),
                                      ("D1L", "labels>A|cells", "g₅"), ("D1L", "labels>A|pooled", "g₅"),
                                      ("D1L", "labels>A|cells", "count gap"), ("D1L", "labels>A|pooled", "count gap"),
                                      ("D1R", "rules>A>estimate_diff>count_gap", "count gap"),
+                                     ("COMPUTED", "d1_corr_median_A|cells", "", "g₅"),
                                      ("COMPUTED", "d1_corr_median_A|pooled", "", "g₅"),
                                      ("COMPUTED", "d1_delta", "", "growth")]),
     ]),
@@ -1040,12 +1058,17 @@ TABLES = [
                        ("R3", "decoders>tesseract>ruleA>table7")]),
         ("NN (reported)", None),
     ]),
-    # D1 (draft 9): the labels under the four readings, and the decisions by stratum and round count
+    # D1 (draft 9): the labels under the four readings, and the decisions by stratum and round count; draft 9.2:
+    # D1 u D1-9's four rows first, then D1's
     ("supplement", "Table S20.", [0, 8], [
-        ("rule A, per cell", _s20_row("A", "cells")),
-        ("rule A, pooled", _s20_row("A", "pooled")),
-        ("no exclusion, per cell", _s20_row("none", "cells")),
-        ("no exclusion, pooled", _s20_row("none", "pooled")),
+        ("D1 ∪ D1-9, rule A, per cell", _s20_row("A", "cells", True)),
+        ("D1 ∪ D1-9, rule A, pooled", _s20_row("A", "pooled", True)),
+        ("D1 ∪ D1-9, no exclusion, per cell", _s20_row("none", "cells", True)),
+        ("D1 ∪ D1-9, no exclusion, pooled", _s20_row("none", "pooled", True)),
+        ("D1, rule A, per cell", _s20_row("A", "cells")),
+        ("D1, rule A, pooled", _s20_row("A", "pooled")),
+        ("D1, no exclusion, per cell", _s20_row("none", "cells")),
+        ("D1, no exclusion, pooled", _s20_row("none", "pooled")),
     ]),
     ("supplement", "Table S21.", [0], [
         ("B, r = 10", [("D1B", "by_round>10>cells>B")]), ("B, r = 30", [("D1B", "by_round>30>cells>B")]),
@@ -1119,6 +1142,24 @@ def computed_values(src):
             out["d1_corr_median_%s|%s" % (rule, rd)] = [(q - d1r[rule]["base"]["g5"]["g"], "D1R rules.%s.%s."
                                                          "g5_correction_only_q025_q50_q975[1] - rules.%s.base.g5.g"
                                                          % (rule, var, rule))]
+    # draft 9.2: the same for D1 u D1-9 ([D1XL], [D1XR]; Tables 4 and S20; ledger V114-V117)
+    labx = src.load(KEYMAP["D1XL"][0])["labels"]
+    d1xr = src.load(KEYMAP["D1XR"][0])["rules"]
+    out["d1x_delta"] = []
+    for rd in ("A|cells", "A|pooled"):
+        for nm, v in [("corrected_g5", labx[rd]["corrected_g5"])] + [
+                ("corrected_g5_ci95_with_shot_noise[%d]" % i, labx[rd]["corrected_g5_ci95_with_shot_noise"][i]) for i in (0, 1)]:
+            out["d1x_delta"].append((math.log1p(v) - math.log1p(g3),
+                                     "D1XL labels.%s.%s, V2D3 census_growth.g3: ln(1+g5) - ln(1+g3)" % (rd, nm)))
+    qpx = d1xr["A"]["posterior_diff_pooled"]["g5_with_shot_noise_q025_q50_q975"][1]
+    out["d1x_delta"].append((math.log1p(qpx) - math.log1p(g3), "D1XR rules.A.posterior_diff_pooled."
+                             "g5_with_shot_noise_q025_q50_q975[1], V2D3 census_growth.g3: ln(1+g5) - ln(1+g3)"))
+    for rule in ("A", "none"):
+        for rd, var in (("cells", "posterior_diff_cells"), ("pooled", "posterior_diff_pooled")):
+            q = d1xr[rule][var]["g5_correction_only_q025_q50_q975"][1]
+            out["d1x_corr_median_%s|%s" % (rule, rd)] = [(q - d1xr[rule]["base"]["g5"]["g"], "D1XR rules.%s.%s."
+                                                          "g5_correction_only_q025_q50_q975[1] - rules.%s.base.g5.g"
+                                                          % (rule, var, rule))]
     cells = src.load(KEYMAP["D1R"][0])["cells"]
     for s in ("B", "D", "C_low", "C_high"):
         out["d1_N_" + s] = [(float(sum(c["N"] for k, c in cells.items() if k.split("|")[0] == s)),
@@ -1621,6 +1662,114 @@ DERIVED.update({
     "V109": [_D91B_LINE, _D91B_TOTAL, ("S11's total, draft 9.1", _rev_total)],
     "V93": DERIVED["V93"] + [_D91B_TOTAL, _D91B_LINE, _D91B_PROJ, _D91B_Y],
     "V94": [_D91B_LINE, _D91B_PROJ, _D91B_Y],
+})
+
+
+# draft 9.2: D1-9, the one-off extension of D1 (rows V110-V119): D1-9's own counts as D1 u D1-9's less D1's,
+# D1 u D1-9's widths, corrections at the medians and Delta, and the revision's compute with D1-9's
+def _d19_diff(g, path):
+    return g.one("D1XR", path) - g.one("D1R", path)
+
+
+def _d1x_corr_median(g, rule, var):
+    return (g.one("D1XR", "rules>%s>%s>g5_correction_only_q025_q50_q975>1" % (rule, var))
+            - g.one("D1XR", "rules>%s>base>g5>g" % rule))
+
+
+def _d1x_width(g, rd):
+    lo, hi = g.all("D1XL", "labels>%s>corrected_g5_ci95_with_shot_noise>*" % rd)
+    return hi - lo
+
+
+def _d1x_width_ratio(g, printed):
+    """D1 u D1-9's primary interval of g5 with shot noise against the headline's: stored ends, or the ends as
+    printed (to 0.01 points)."""
+    lo, hi = g.all("D1XL", "labels>A|cells>corrected_g5_ci95_with_shot_noise>*")
+    blo, bhi = g.all("D1XR", "rules>A>base>g5>ci95>*")
+    if printed:
+        lo, hi, blo, bhi = (round(100 * x, 2) for x in (lo, hi, blo, bhi))
+    return (hi - lo) / (bhi - blo)
+
+
+def _headline_width_printed(g):
+    """The headline's 95% CI of g5 as printed, [4.23, 9.09]%: its width in points."""
+    blo, bhi = g.all("D1XR", "rules>A>base>g5>ci95>*")
+    return round(100 * bhi, 2) - round(100 * blo, 2)
+
+
+def _d1x_delta(g, rd, nm):
+    lab = g.src.load(KEYMAP["D1XL"][0])["labels"][rd]
+    v = lab["corrected_g5"] if nm == "point" else lab["corrected_g5_ci95_with_shot_noise"][0 if nm == "lo" else 1]
+    return math.log1p(v) - math.log1p(g.one("V2D3", "census_growth>g3"))
+
+
+def _post_sum(g, key, time_z, regex):
+    """The sum of the numbers that a regular expression's groups take from one board post."""
+    txt = board_scope(g.src.load(KEYMAP[key][0]), time_z)
+    m = re.search(regex, txt or "")
+    if not m:
+        raise KeyError("%s %s: %s" % (key, time_z, regex))
+    return sum(float(x.replace(",", "")) for x in m.groups())
+
+
+def _d19_runs(g):
+    """D1-9's runs in all, by decoder's counters (its post of 16:47:51Z), in core-hours."""
+    return _post_num(g, "DB", "16:47:51Z", r"\*\*D1-9's runs in all:\*\* (\d+\.\d+)")
+
+
+def _d19_small_work(g):
+    """D1-9's work from the small-work allowance: the draw and the analysis after the runs (16:47:51Z) and the
+    selection script's synthetic tests (15:01:22Z), in core-hours."""
+    return (_post_num(g, "DB", "16:47:51Z", r"\*\*The draw:\*\* \d+ s, about (\d+\.\d+)")
+            + _post_num(g, "DB", "16:47:51Z", r"\*\*The post-run work\*\* used about (\d+\.\d+)")
+            + _post_num(g, "DB", "15:01:22Z", r"the synthetic tests about (\d+\.\d+) core-hours"))
+
+
+_D92_DIFFS = [("D1XR %s less D1R's: D1-9's own" % p.replace(">", "."), (lambda p: lambda g: _d19_diff(g, p))(p))
+             for p in ("sample>mps_done", "sample>mps_resolved", "sample>mps_done_with_rung_errors",
+                       "sample>mps_done_with_nan_rungs", "audit>all>audited", "audit>all>fired",
+                       "audit>all>decision_changed_after_first_fire", "agreement>mps_vs_aux>overall>disagree",
+                       "agreement>mps_vs_paper>overall>disagree")]
+DERIVED.update({
+    "V110": [("D1XS sides_d1_9: the sum of n, D1-9's shots", lambda g: sum(g.all("D1XS", "sides_d1_9>*>n")))],
+    "V111": _D92_DIFFS,
+    "V112": _D92_DIFFS + [("D1XR rules.A.estimate_diff.cells.C_high|50.right.n less D1R's",
+                           lambda g: _d19_diff(g, "rules>A>estimate_diff>cells>C_high|50>right>n"))],
+    "V113": [("D1XR agreement.aux_vs_paper_in_sample: B + D aux_differs",
+              lambda g: g.one("D1XR", "agreement>aux_vs_paper_in_sample>B>aux_differs")
+              + g.one("D1XR", "agreement>aux_vs_paper_in_sample>D>aux_differs"))],
+    "V114": [("D1XR rules.A.posterior_diff_cells: the median of g5 from the correction alone less rules.A.base.g5.g",
+              lambda g: _d1x_corr_median(g, "A", "posterior_diff_cells")),
+             ("D1XL labels.A|cells.corrected_g5_ci95_with_shot_noise: the width", lambda g: _d1x_width(g, "A|cells")),
+             ("D1XL labels.A|cells.corrected_g5_ci95_with_shot_noise against D1XR rules.A.base.g5.ci95: the ratio of "
+              "the widths", lambda g: _d1x_width_ratio(g, False)),
+             ("the same ratio from the ends as printed (to 0.01 points)", lambda g: _d1x_width_ratio(g, True)),
+             ("D1XR rules.A.base.g5.ci95: the headline's width from the ends as printed", _headline_width_printed),
+             ("D1's ratio (D1L, D1R; V100)", lambda g: _d1_width_ratio(g, False))],
+    "V114a": [("D1XL labels.%s: ln(1 + g5) - ln(1 + g3), g3 = V2D3 census_growth.g3 (%s)" % (rd, nm),
+               (lambda rd, nm: lambda g: _d1x_delta(g, rd, nm))(rd, nm))
+              for rd in ("A|cells", "A|pooled") for nm in ("point", "lo", "hi")]
+             + [("D1XR rules.A.posterior_diff_pooled.g5_with_shot_noise_q025_q50_q975[1], V2D3 census_growth.g3: "
+                 "ln(1+g5) - ln(1+g3)",
+                 lambda g: math.log1p(g.one("D1XR", "rules>A>posterior_diff_pooled>g5_with_shot_noise_q025_q50_q975>1"))
+                 - math.log1p(g.one("V2D3", "census_growth>g3")))],
+    "V115": [("D1XR rules.A.posterior_diff_pooled: the median of g5 from the correction alone less rules.A.base.g5.g",
+              lambda g: _d1x_corr_median(g, "A", "posterior_diff_pooled"))],
+    "V116": [("D1XR rules.none.posterior_diff_cells: the median of g5 from the correction alone less "
+              "rules.none.base.g5.g", lambda g: _d1x_corr_median(g, "none", "posterior_diff_cells"))],
+    "V117": [("D1XR rules.none.posterior_diff_pooled: the median of g5 from the correction alone less "
+              "rules.none.base.g5.g", lambda g: _d1x_corr_median(g, "none", "posterior_diff_pooled"))],
+    "V119": [("DB 16:47:51Z: D1-9's runs in all", _d19_runs),
+             ("DB 16:47:51Z: D1-9's MPS, the sum of its three workers",
+              lambda g: _post_sum(g, "DB", "16:47:51Z", r"worker 2 (\d+\.\d+), worker 3 (\d+\.\d+), worker 4 (\d+\.\d+)\)")),
+             ("DB 16:47:51Z: D1-9's sparse, the sum of its three workers",
+              lambda g: _post_sum(g, "DB", "16:47:51Z", r"sparse:\*\* [\d.]+ \((\d+\.\d+), (\d+\.\d+) and (\d+\.\d+)\)")),
+             ("DB 16:47:51Z and 15:01:22Z: D1-9's draw, analysis and synthetic tests, from the small-work allowance",
+              _d19_small_work),
+             ("S11's basis before D1-9: the five analyses (V93)", _rev_stages),
+             ("S11's six analyses: the five (V93) + D1-9's runs", lambda g: _rev_stages(g) + _d19_runs(g)),
+             ("S11's total, draft 9.2: draft 9.1b's + D1-9's runs", lambda g: _rev_total_91b(g) + _d19_runs(g)),
+             _D91B_TOTAL, _D91B_Y],
 })
 
 
