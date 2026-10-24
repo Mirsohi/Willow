@@ -14,7 +14,7 @@ It runs no decoder. From the stored result files alone it re-derives what the te
   L2  redraws Figs. 1, 2 and S1 with scout's figure scripts (Fig. 2 from the L1 output) and Figs. 3, 4, S2 and S3
       with decoder's figures() (code/decoder/analyze_willow.py, imported read-only) from the stored analysis, and
       compares each with the draft's PNG pixel by pixel and byte by byte (the shared folder's caBX chunk removed).
-  L3  regenerates the numbers of Tables 2-5 (main text) and S7, S8, S20 and S22 (supplement): every number in a table cell must
+  L3  regenerates the numbers of Tables 2-5 (main text) and S7, S8, S20-S22 and S24 (supplement): every number in a table cell must
       equal, at the precision printed, a value under the result-file keys that the row's specification names.
   L4  checks every number of the ledger (numbers.md) against the file and key that its row cites, in the L1
       outputs (scout's derived files) or in the stored result files (decoder's and reservoir's).
@@ -35,10 +35,14 @@ INPUT lines compare the md5 of each data file named in the ledger's key tables w
 (PASS or DIFFERS; notes and boards change by design and are not held to theirs).
 
 Writes into --out: the regenerated files, reproduce_report.json, reproduce_log.txt and reproduce_inputs.md (every
-input file read under the root, with its size and md5; code files listed separately). Exit status 1 if L1, L2 or
-L3 has a FAIL, else 0. Needs Python 3.10+, numpy, scipy, matplotlib and Pillow (made with 3.13, numpy 2.5.3, scipy
+input file read under the root, with its size and md5; code files listed separately). MANIFEST lines say, for each
+script the entry point ran, whether its record of the files it read is complete (FAIL: an open that the audit hook
+could not record, so the manifest may miss a file). Exit status 1 if L1, L2, L3 or MANIFEST has a FAIL, else 0.
+Needs Python 3.10+, numpy, scipy, matplotlib and Pillow (made with 3.13, numpy 2.5.3, scipy
 1.18.1, matplotlib 3.11.2, Pillow 12.3.0; figures are byte-identical only with the same matplotlib and fonts).
-Scout, 2026-10-13; post hoc tooling, no new analysis.
+Scout, 2026-10-13; post hoc tooling, no new analysis. Draft 9 (2026-10-24): D1's analysis files ([D1R], [D1L],
+[D1B] and their reports) and Tables S20 and S21 added; the supplement's Tables S20 and S22 of draft 8.1 are now
+S22 and S24; the audit hooks no longer call os.getcwd() on each open, and the MANIFEST check is new.
 """
 import argparse
 import csv
@@ -65,7 +69,17 @@ THIS = os.path.abspath(__file__)
 
 # ------------------------------------------------------------------------------------------------ child mode
 
+def _absolute(p, cwd0):
+    """The absolute path of p, from the working directory the process started in (the scripts do not change it).
+    os.path.abspath calls os.getcwd() on every open, and on the shared folder that call can fail for a while: in the
+    first run on draft 9 the record of the V2D3 rerun stopped partway, most likely so, and the manifest missed 269
+    of its files. A failure to record is now kept in the record, and the parent reports it as a manifest FAIL."""
+    return os.path.normpath(p if os.path.isabs(p) else os.path.join(cwd0, p))
+
+
 def _child_record_hook(rec):
+    cwd0 = os.getcwd()
+
     def hook(event, args):
         try:
             if event == "open":
@@ -77,20 +91,23 @@ def _child_record_hook(rec):
                     w = any(c in mode for c in "wax+")
                 else:
                     w = bool(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT)) if isinstance(flags, int) else False
-                rec["write" if w else "read"].add(os.path.abspath(p))
+                rec["write" if w else "read"].add(_absolute(p, cwd0))
             elif event in ("os.listdir", "os.scandir"):
                 p = args[0] if args else "."
                 if isinstance(p, (str, bytes, os.PathLike)):
-                    rec["listdir"].add(os.path.abspath(os.fsdecode(p)))
-        except Exception:
-            pass
+                    rec["listdir"].add(_absolute(os.fsdecode(p), cwd0))
+        except Exception as e:  # recorded, so that the parent can report an incomplete record
+            try:
+                rec["errors"].add("%s %r: %r" % (event, args[0] if args else None, e))
+            except Exception:
+                pass
     return hook
 
 
 def child_main(argv):
     """--child RECORD SCRIPT ARGS... | --child-decoder-figs RECORD ANALYSIS_JSON REPORTED_JSON OUTDIR"""
     mode, record = argv[0], argv[1]
-    rec = {"read": set(), "write": set(), "listdir": set()}
+    rec = {"read": set(), "write": set(), "listdir": set(), "errors": set()}
     sys.addaudithook(_child_record_hook(rec))
 
     def dump():
@@ -309,6 +326,10 @@ KEYMAP = {
     "D3R13": [W + "revision/d3_facts/d3_r13_census.json"], "D3D7": [W + "revision/d3_facts/d3_d7r13_census.json"],
     "D3F": [W + "revision/d3_facts/d3_facts.json", W + "revision/d3_facts/d3_facts.md"], "REP": ["code/decoder/willow_reported.json"],
     "A1R2": [W + "revision/a1r2/a1r2_results.json"], "A1R2X": [W + "revision/a1r2/a1r2x_results.json"],
+    # D1 (draft 9): the independent contraction's analysis, labels and counts by round count
+    "D1R": [W + "revision/d1_mps/analysis/d1_results.json"], "D1L": [W + "revision/d1_mps/analysis/d1_labels.json"],
+    "D1B": [W + "revision/d1_mps/analysis/d1_byround.json"], "D1RM": [W + "revision/d1_mps/analysis/d1_results.md"],
+    "D1BM": [W + "revision/d1_mps/analysis/d1_byround.md"],
     # reservoir
     "GTF": ["results/reservoir/willow_gapmech/final_k2/gap_table.json", "results/reservoir/willow_gapmech/final_k2/gap_series.csv"],
     "EAF": ["results/reservoir/willow_gapmech/final_k2/exact_analysis.json"],
@@ -922,7 +943,11 @@ TABLES = [
         ("census, flip rates per round count", [("V2D3", "census_growth>C_only|*|A")]),
         ("census, how the strata", [("V2D3", "census_growth>A")]),
         ("targeted check of the per-round floor", [("A1R2", "primary"), ("A1R2X", "libra"), ("V2D3", "g3_W5", "growth")]),
-        ("independent contraction", []),
+        # D1 (draft 9): the contraction's row; its intervals are the labels' posterior intervals with shot noise
+        ("independent contraction", [("D1L", "labels>A|cells", "g₅"), ("D1L", "labels>A|pooled", "g₅"),
+                                     ("D1L", "labels>A|cells", "count gap"), ("D1L", "labels>A|pooled", "count gap"),
+                                     ("D1R", "rules>A>estimate_diff>count_gap", "count gap"),
+                                     ("COMPUTED", "d1_delta", "", "growth")]),
     ]),
     ("manuscript", "Table 5.", [0, 1], [
         ("RL, shipped", [("V2D3", "b9>RL")]),
@@ -989,7 +1014,33 @@ TABLES = [
                        ("R3", "decoders>tesseract>ruleA>table7")]),
         ("NN (reported)", None),
     ]),
-    ("supplement", "Table S20.", [0], [
+    # D1 (draft 9): the labels under the four readings, and the decisions by stratum and round count
+    ("supplement", "Table S20.", [0, 7], [
+        ("rule A, per cell", [("D1L", "labels>A|cells")]),
+        ("rule A, pooled", [("D1L", "labels>A|pooled")]),
+        ("no exclusion, per cell", [("D1L", "labels>none|cells")]),
+        ("no exclusion, pooled", [("D1L", "labels>none|pooled")]),
+    ]),
+    ("supplement", "Table S21.", [0], [
+        ("B, r = 10", [("D1B", "by_round>10>cells>B")]), ("B, r = 30", [("D1B", "by_round>30>cells>B")]),
+        ("B, r = 50", [("D1B", "by_round>50>cells>B")]),
+        ("B, all r", [("D1R", "agreement>mps_vs_paper>B"), ("COMPUTED", "d1_N_B", "", "N")]),
+        ("D, r = 10", [("D1B", "by_round>10>cells>D")]), ("D, r = 30", [("D1B", "by_round>30>cells>D")]),
+        ("D, r = 50", [("D1B", "by_round>50>cells>D")]),
+        ("D, all r", [("D1R", "agreement>mps_vs_paper>D"), ("COMPUTED", "d1_N_D", "", "N")]),
+        ("C_low, r = 10", [("D1B", "by_round>10>cells>C_low")]), ("C_low, r = 30", [("D1B", "by_round>30>cells>C_low")]),
+        ("C_low, r = 50", [("D1B", "by_round>50>cells>C_low")]),
+        ("C_low, all r", [("D1R", "agreement>mps_vs_paper>C_low"), ("COMPUTED", "d1_N_C_low", "", "N")]),
+        ("C_high, r = 10", [("D1B", "by_round>10>cells>C_high")]),
+        ("C_high, r = 30", [("D1B", "by_round>30>cells>C_high")]),
+        ("C_high, r = 50", [("D1B", "by_round>50>cells>C_high")]),
+        ("C_high, all r", [("D1R", "agreement>mps_vs_paper>C_high"), ("COMPUTED", "d1_N_C_high", "", "N")]),
+        ("all strata, r = 10", [("D1R", "agreement>mps_vs_paper>all|10"), ("D1B", "by_round>10>population_weighted")]),
+        ("all strata, r = 30", [("D1R", "agreement>mps_vs_paper>all|30"), ("D1B", "by_round>30>population_weighted")]),
+        ("all strata, r = 50", [("D1R", "agreement>mps_vs_paper>all|50"), ("D1B", "by_round>50>population_weighted")]),
+        ("all strata, all r", [("D1R", "agreement>mps_vs_paper>overall"), ("COMPUTED", "d1_N_all", "", "N")]),
+    ]),
+    ("supplement", "Table S22.", [0], [
         ("exact MPE, d = 3", [("R2A", "concordance>mpe_tau|10_30|d3|ruleA")]),
         ("MPE_τ, d = 5", [("R2A", "concordance>mpe_tau|10_30|d5|ruleA")]),
         ("Tesseract, d = 5", [("R2A", "concordance>tesseract|10_30|d5|ruleA")]),
@@ -998,7 +1049,7 @@ TABLES = [
         ("corr. MWPM, ours, d = 5", [("R2A", "concordance_reference>corr_mwpm|10_30|d5|ruleA")]),
         ("MWPM, ours, d = 5", [("R2A", "concordance_reference>mwpm|10_30|d5|ruleA")]),
     ]),
-    ("supplement", "Table S22.", [0], [
+    ("supplement", "Table S24.", [0], [
         ("Libra", [("A1R2X", "decoders>libra")]),
         ("Harmony", [("A1R2X", "decoders>harmony")]),
         ("corr. matching", [("A1R2X", "decoders>corrmatch")]),
@@ -1020,6 +1071,21 @@ def computed_values(src):
     conf = src.load(KEYMAP["R4A"][0])["matched_S_converged"]["calibration"]["S"]["ML"]["conf"]
     out["r4_S_rconf_se"] = [(conf["ratio"] / math.sqrt(conf["errors"]),
                              "R4A matched_S_converged.calibration.S.ML.conf: ratio/sqrt(errors)")]
+    # D1 (draft 9): growth with the contraction's g5, Delta = ln(1 + g5) - ln(1 + g3), g3 at its estimate
+    # (Table 4; ledger V89), and each stratum's population, the sum of its cells' (Table S21; ledger V85)
+    g3 = src.load(KEYMAP["V2D3"][0])["census_growth"]["g3"]
+    lab = src.load(KEYMAP["D1L"][0])["labels"]
+    out["d1_delta"] = []
+    for rd in ("A|cells", "A|pooled"):
+        for nm, v in [("corrected_g5", lab[rd]["corrected_g5"])] + [
+                ("corrected_g5_ci95_with_shot_noise[%d]" % i, lab[rd]["corrected_g5_ci95_with_shot_noise"][i]) for i in (0, 1)]:
+            out["d1_delta"].append((math.log1p(v) - math.log1p(g3),
+                                    "D1L labels.%s.%s, V2D3 census_growth.g3: ln(1+g5) - ln(1+g3)" % (rd, nm)))
+    cells = src.load(KEYMAP["D1R"][0])["cells"]
+    for s in ("B", "D", "C_low", "C_high"):
+        out["d1_N_" + s] = [(float(sum(c["N"] for k, c in cells.items() if k.split("|")[0] == s)),
+                             "D1R cells.%s|*: the sum of N" % s)]
+    out["d1_N_all"] = [(float(sum(c["N"] for c in cells.values())), "D1R cells: the sum of N")]
     return out
 
 
@@ -1355,6 +1421,84 @@ DERIVED.update({
 })
 
 
+DECL_DEC = "notes/decoder/willow_revision_declarations.md"
+
+
+def _decl_num(g, head, regex):
+    """A number from one section of decoder's declarations (the section whose heading starts '## head:')."""
+    txt = g.src.load(DECL_DEC)
+    i = txt.find("\n## %s:" % head)
+    if i < 0:
+        raise KeyError(head)
+    j = txt.find("\n## ", i + 4)
+    m = re.search(regex, txt[i:j if j > 0 else len(txt)])
+    if not m:
+        raise KeyError("%s: %s" % (head, regex))
+    return float(m.group(1).replace(",", ""))
+
+
+def _post_num(g, key, time_z, regex):
+    """A number from one board post (the post whose header holds the time), by a regular expression."""
+    txt = board_scope(g.src.load(KEYMAP[key][0]), time_z)
+    m = re.search(regex, txt or "")
+    if not m:
+        raise KeyError("%s %s: %s" % (key, time_z, regex))
+    return float(m.group(1).replace(",", ""))
+
+
+def _d1_N(g, r, strata):
+    return sum(g.one("D1B", "by_round>%s>cells>%s>N" % (r, s)) for s in strata)
+
+
+def _rev_stages(g):
+    """S11's basis: R1 + R2 + R4 (reservoir's 01:57Z sum) + A1-R2 and D1 (decoder's 08:00:43Z post)."""
+    res = _post_num(g, "RB", "01:57Z", r"R1 [\d.]+ \+ R2 [\d.]+ \+ R4 [\d.]+ = \*\*(\d+\.\d+) core-hours")
+    a1r2 = _post_num(g, "DB", "08:00:43Z", r"A1-R2 (\d+\.\d+)\)")
+    d1 = _post_num(g, "DB", "08:00:43Z", r"\*\*D1 in all:\*\* (\d+\.\d+)")
+    return res + a1r2 + d1
+
+
+def _rev_total(g):
+    """S11's total: the stages, decoder's on-no-counter and scout-and-main estimates, and the small-work allowance
+    less D1's analysis (which D1's 28.42 already holds)."""
+    nc = _post_num(g, "DB", "08:00:43Z", r"decoder, on no counter \[estimate\] \| (\d+\.\d+)")
+    sm = _post_num(g, "DB", "08:00:43Z", r"scout and main \[estimate\][^|]*\| (\d+\.\d+)")
+    sw = _post_num(g, "DB", "08:00:43Z", r"small work: its (\d+\.\d+) allowance")
+    an = _post_num(g, "DB", "08:00:43Z", r"small work: its [\d.]+ allowance, of which D1's analysis, labels and tables used (\d+\.\d+)")
+    return _rev_stages(g) + nc + sm + (sw - an)
+
+
+# D1 (draft 9): the ledger's arithmetic on D1's files and on the revision's compute (rows V82, V83, V85, V87, V89, V93)
+DERIVED.update({
+    "V79": [("D1R cells: the sum of N", lambda g: sum(g.all("D1R", "cells>*>N")))],
+    "V82a": [("D1-4e's table: rows done by workers 0 and 1 at the restart",
+              lambda g: _decl_num(g, "D1-4e", r"\| 0 \| (\d+) of 1,250") + _decl_num(g, "D1-4e", r"\| 1 \| (\d+) of 1,250")),
+             ("D1-4: rows done by workers 0 and 1 at the stops of 13 October",
+              lambda g: _decl_num(g, "D1-4", r"Worker 0: (\d+) of 1,250") + _decl_num(g, "D1-4", r"Worker 1: (\d+) of 1,250"))],
+    "V83": [("D1R audit.all: decision_changed_after_first_fire / fired",
+             lambda g: g.one("D1R", "audit>all>decision_changed_after_first_fire") / g.one("D1R", "audit>all>fired"))],
+    "V85": [("D1R cells: the sum of N over %s's cells" % s, (lambda s: lambda g: sum(
+        g.all("D1R", "cells>%s|*>N" % s)))(s)) for s in ("B", "D", "C_low", "C_high")]
+           + [("D1R cells: the sum of N", lambda g: sum(g.all("D1R", "cells>*>N")))],
+    "V87": [("D1B by_round.%s.cells: (N_B + N_D) / 80,000, the band and discordant share" % r,
+             (lambda r: lambda g: _d1_N(g, r, ("B", "D")) / g.one("D1B", "by_round>%s>population_weighted>mps_vs_paper>N" % r))(r))
+            for r in ("10", "30", "50")]
+           + [("D1B by_round.%s.cells: N_B + N_D" % r, (lambda r: lambda g: _d1_N(g, r, ("B", "D")))(r)) for r in ("10", "30", "50")]
+           + [("D1R agreement.mps_vs_paper: (B + D) disagreements", lambda g: g.one("D1R", "agreement>mps_vs_paper>B>disagree")
+               + g.one("D1R", "agreement>mps_vs_paper>D>disagree"))],
+    "V89": [("D1L labels.%s: ln(1 + g5) - ln(1 + g3), g3 = V2D3 census_growth.g3 (%s)" % (rd, nm),
+             (lambda rd, nm: lambda g: math.log1p(_d1_g5(g, rd, nm)) - math.log1p(g.one("V2D3", "census_growth>g3")))(rd, nm))
+            for rd in ("A|cells", "A|pooled") for nm in ("point", "lo", "hi")],
+    "V93": [("S11's basis: RB 01:57Z (R1 + R2 + R4) + DB 08:00:43Z (A1-R2, D1 in all)", _rev_stages),
+            ("S11's total: the stages + on no counter + scout and main + (small work - D1's analysis)", _rev_total)],
+})
+
+
+def _d1_g5(g, rd, nm):
+    lab = g.src.load(KEYMAP["D1L"][0])["labels"][rd]
+    return lab["corrected_g5"] if nm == "point" else lab["corrected_g5_ci95_with_shot_noise"][0 if nm == "lo" else 1]
+
+
 def derived_for(g, rname):
     out = []
     for k, items in DERIVED.items():
@@ -1515,12 +1659,15 @@ def layer2(root, out, draft, regen_dir, results, reads):
 # ------------------------------------------------------------------------------------------------ manifest
 
 def write_manifest(root, out, reads, parent_reads, path):
-    files = {}
+    files, incomplete = {}, []
     for key, rec in reads.items():
         try:
             r = json.load(open(rec))
-        except (OSError, ValueError):
+        except (OSError, ValueError) as e:
+            incomplete.append((key, "no record (%s)" % e))
             continue
+        if r.get("errors"):
+            incomplete.append((key, "%d opens not recorded, the first: %s" % (len(r["errors"]), r["errors"][0])))
         for p in r.get("read", []):
             files.setdefault(p, set()).add(key)
     for p in parent_reads:
@@ -1572,9 +1719,13 @@ def write_manifest(root, out, reads, parent_reads, path):
         L += ["| `%s` | %s |" % r for r in sorted(unseen)]
         say("WARNING manifest: %d recorded reads not found when the manifest was written: %s"
             % (len(unseen), ", ".join(r[0] for r in sorted(unseen))))
+    if incomplete:
+        L += ["", "## Incomplete records: this manifest may miss files these jobs read (%d)" % len(incomplete), "",
+              "| job | record |", "|---|---|"]
+        L += ["| %s | %s |" % (k, v.replace("|", "/")) for k, v in sorted(incomplete)]
     with open(path, "w") as f:
         f.write("\n".join(L) + "\n")
-    return len(data), len(code)
+    return len(data), len(code), incomplete
 
 
 # ------------------------------------------------------------------------------------------------ main
@@ -1605,7 +1756,7 @@ def main():
         if event == "open" and args and isinstance(args[0], (str, bytes, os.PathLike)):
             mode = args[1]
             if isinstance(mode, str) and not any(c in mode for c in "wax+"):
-                p = os.path.abspath(os.fsdecode(args[0]))
+                p = _absolute(os.fsdecode(args[0]), rootabs)
                 if p.startswith(rootabs + "/"):
                     parent_reads.add(p)
     sys.addaudithook(hook)
@@ -1622,16 +1773,24 @@ def main():
         layer2(root, out, a.draft, regen_dir, results, reads)
     src = Sources(root, regen_dir)
     if "L3" not in skip:
-        say("\n== L3: Tables 2-5 (main text) and S7, S8, S20 and S22 (supplement)")
+        say("\n== L3: Tables 2-5 (main text) and S7, S8, S20-S22 and S24 (supplement)")
         check_tables(src, a.draft, results)
     if "L4" not in skip:
         say("\n== L4: the ledger (%s), row by row" % (a.ledger or os.path.join(a.draft, "numbers.md")))
         check_ledger(src, open(a.ledger or os.path.join(a.draft, "numbers.md"), encoding="utf-8").read(), results)
+    # the manifest before the summary, so that an incomplete record of a job's reads counts as a FAIL
+    man_path = a.manifest or os.path.join(out, "reproduce_inputs.md")
+    nd, ncode, incomplete = write_manifest(root, out, reads, parent_reads, man_path)
+    why = dict(incomplete)
+    for key in reads:
+        results.append(("MANIFEST", "FAIL" if key in why else "PASS", key, why.get(key, "record complete")))
+        if key in why:
+            say("FAIL  MANIFEST [%s]: %s" % (key, why[key]))
     # summary
     from collections import Counter
     say("\n== Summary")
     c = Counter((r[0], r[1]) for r in results)
-    for layer in ("INPUT", "L1", "L2", "L3", "L4"):
+    for layer in ("INPUT", "L1", "L2", "L3", "L4", "MANIFEST"):
         parts = ["%s %d" % (st, n) for (ly, st), n in sorted(c.items()) if ly == layer]
         if parts:
             say("%-5s %s" % (layer, ", ".join(parts)))
@@ -1641,10 +1800,10 @@ def main():
             say("%s PASS by strength: %s" % (layer, ", ".join("%s %d" % (k or "?", n) for k, n in how.most_common())))
     if src.missing:
         say("files cited but not found: %s" % ", ".join(sorted(src.missing)))
-    nd, ncode = write_manifest(root, out, reads, parent_reads, a.manifest or os.path.join(out, "reproduce_inputs.md"))
-    say("manifest: %d data files and %d code files -> %s" % (nd, ncode + 1, a.manifest or os.path.join(out, "reproduce_inputs.md")))
-    bad = sum(n for (ly, st), n in c.items() if ly in ("L1", "L2", "L3") and st == "FAIL")
-    say("done in %.0f s; %s" % (time.time() - t0, "no FAIL in L1-L3" if not bad else "%d FAIL in L1-L3" % bad))
+    say("manifest: %d data files and %d code files -> %s" % (nd, ncode + 1, man_path))
+    bad = sum(n for (ly, st), n in c.items() if ly in ("L1", "L2", "L3", "MANIFEST") and st == "FAIL")
+    say("done in %.0f s; %s" % (time.time() - t0, "no FAIL in L1-L3 or the manifest" if not bad
+                                 else "%d FAIL in L1-L3 or the manifest" % bad))
     json.dump({"results": results, "counts": {"%s %s" % k: v for k, v in c.items()}, "seconds": time.time() - t0},
               open(os.path.join(out, "reproduce_report.json"), "w"), indent=0)
     with open(os.path.join(out, "reproduce_log.txt"), "w") as f:
