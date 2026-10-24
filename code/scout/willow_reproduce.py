@@ -42,7 +42,9 @@ Needs Python 3.10+, numpy, scipy, matplotlib and Pillow (made with 3.13, numpy 2
 1.18.1, matplotlib 3.11.2, Pillow 12.3.0; figures are byte-identical only with the same matplotlib and fonts).
 Scout, 2026-10-13; post hoc tooling, no new analysis. Draft 9 (2026-10-24): D1's analysis files ([D1R], [D1L],
 [D1B] and their reports) and Tables S20 and S21 added; the supplement's Tables S20 and S22 of draft 8.1 are now
-S22 and S24; the audit hooks no longer call os.getcwd() on each open, and the MANIFEST check is new.
+S22 and S24; the audit hooks no longer call os.getcwd() on each open, and the MANIFEST check is new. Draft 9.1
+(2026-10-24): decoder's D1-8 projection ([DPJ], [DPJM]) added; L3 checks Table 4's pooled median and Table S20's
+posterior medians; L4 registers the arithmetic of ledger rows V97, V98 and V100-V102.
 """
 import argparse
 import csv
@@ -330,6 +332,9 @@ KEYMAP = {
     "D1R": [W + "revision/d1_mps/analysis/d1_results.json"], "D1L": [W + "revision/d1_mps/analysis/d1_labels.json"],
     "D1B": [W + "revision/d1_mps/analysis/d1_byround.json"], "D1RM": [W + "revision/d1_mps/analysis/d1_results.md"],
     "D1BM": [W + "revision/d1_mps/analysis/d1_byround.md"],
+    # D1-8 (draft 9.1): the post hoc projection of the sample that would make D1's primary reading decisive
+    "DPJ": [W + "revision/d1_mps/projection/d1_projection.json"],
+    "DPJM": [W + "revision/d1_mps/projection/d1_projection.md"],
     # reservoir
     "GTF": ["results/reservoir/willow_gapmech/final_k2/gap_table.json", "results/reservoir/willow_gapmech/final_k2/gap_series.csv"],
     "EAF": ["results/reservoir/willow_gapmech/final_k2/exact_analysis.json"],
@@ -898,6 +903,15 @@ def _t3_row(dec, d3=None, d5=None):
             ("R3", "decoders>%s>ruleA>table7" % dec)] + (d3 or []) + (d5 or [])
 
 
+def _s20_row(rule, rd):
+    """Table S20's row: the labels' values, and (draft 9.1) the posterior medians, of g5 with shot noise and of the
+    correction alone (its median less the paper's g5)."""
+    var = "posterior_diff_cells" if rd == "cells" else "posterior_diff_pooled"
+    return [("D1L", "labels>%s|%s" % (rule, rd)),
+            ("D1R", "rules>%s>%s>g5_with_shot_noise_q025_q50_q975>1" % (rule, var), "posterior median"),
+            ("COMPUTED", "d1_corr_median_%s|%s" % (rule, rd), "", "posterior median")]
+
+
 TABLES = [
     ("manuscript", "Table 2.", [0, 1, 2], [
         ("P1 (PR1", [("SEC", "full_delta_method_inflated")]),
@@ -944,9 +958,12 @@ TABLES = [
         ("census, how the strata", [("V2D3", "census_growth>A")]),
         ("targeted check of the per-round floor", [("A1R2", "primary"), ("A1R2X", "libra"), ("V2D3", "g3_W5", "growth")]),
         # D1 (draft 9): the contraction's row; its intervals are the labels' posterior intervals with shot noise
-        ("independent contraction", [("D1L", "labels>A|cells", "g₅"), ("D1L", "labels>A|pooled", "g₅"),
+        # draft 9.1: the pooled posterior's quantiles first, so that its median is matched at its own key
+        ("independent contraction", [("D1R", "rules>A>posterior_diff_pooled>g5_with_shot_noise_q025_q50_q975", "g₅"),
+                                     ("D1L", "labels>A|cells", "g₅"), ("D1L", "labels>A|pooled", "g₅"),
                                      ("D1L", "labels>A|cells", "count gap"), ("D1L", "labels>A|pooled", "count gap"),
                                      ("D1R", "rules>A>estimate_diff>count_gap", "count gap"),
+                                     ("COMPUTED", "d1_corr_median_A|pooled", "", "g₅"),
                                      ("COMPUTED", "d1_delta", "", "growth")]),
     ]),
     ("manuscript", "Table 5.", [0, 1], [
@@ -1015,11 +1032,11 @@ TABLES = [
         ("NN (reported)", None),
     ]),
     # D1 (draft 9): the labels under the four readings, and the decisions by stratum and round count
-    ("supplement", "Table S20.", [0, 7], [
-        ("rule A, per cell", [("D1L", "labels>A|cells")]),
-        ("rule A, pooled", [("D1L", "labels>A|pooled")]),
-        ("no exclusion, per cell", [("D1L", "labels>none|cells")]),
-        ("no exclusion, pooled", [("D1L", "labels>none|pooled")]),
+    ("supplement", "Table S20.", [0, 8], [
+        ("rule A, per cell", _s20_row("A", "cells")),
+        ("rule A, pooled", _s20_row("A", "pooled")),
+        ("no exclusion, per cell", _s20_row("none", "cells")),
+        ("no exclusion, pooled", _s20_row("none", "pooled")),
     ]),
     ("supplement", "Table S21.", [0], [
         ("B, r = 10", [("D1B", "by_round>10>cells>B")]), ("B, r = 30", [("D1B", "by_round>30>cells>B")]),
@@ -1081,6 +1098,18 @@ def computed_values(src):
                 ("corrected_g5_ci95_with_shot_noise[%d]" % i, lab[rd]["corrected_g5_ci95_with_shot_noise"][i]) for i in (0, 1)]:
             out["d1_delta"].append((math.log1p(v) - math.log1p(g3),
                                     "D1L labels.%s.%s, V2D3 census_growth.g3: ln(1+g5) - ln(1+g3)" % (rd, nm)))
+    # draft 9.1: Delta at the pooled posterior's median g5 (Table 4; V98), and each reading's correction at its
+    # posterior median, the median of g5 from the correction alone less the paper's g5 (Tables 4 and S20; V97)
+    d1r = src.load(KEYMAP["D1R"][0])["rules"]
+    qp = d1r["A"]["posterior_diff_pooled"]["g5_with_shot_noise_q025_q50_q975"][1]
+    out["d1_delta"].append((math.log1p(qp) - math.log1p(g3), "D1R rules.A.posterior_diff_pooled."
+                            "g5_with_shot_noise_q025_q50_q975[1], V2D3 census_growth.g3: ln(1+g5) - ln(1+g3)"))
+    for rule in ("A", "none"):
+        for rd, var in (("cells", "posterior_diff_cells"), ("pooled", "posterior_diff_pooled")):
+            q = d1r[rule][var]["g5_correction_only_q025_q50_q975"][1]
+            out["d1_corr_median_%s|%s" % (rule, rd)] = [(q - d1r[rule]["base"]["g5"]["g"], "D1R rules.%s.%s."
+                                                         "g5_correction_only_q025_q50_q975[1] - rules.%s.base.g5.g"
+                                                         % (rule, var, rule))]
     cells = src.load(KEYMAP["D1R"][0])["cells"]
     for s in ("B", "D", "C_low", "C_high"):
         out["d1_N_" + s] = [(float(sum(c["N"] for k, c in cells.items() if k.split("|")[0] == s)),
@@ -1491,6 +1520,54 @@ DERIVED.update({
             for rd in ("A|cells", "A|pooled") for nm in ("point", "lo", "hi")],
     "V93": [("S11's basis: RB 01:57Z (R1 + R2 + R4) + DB 08:00:43Z (A1-R2, D1 in all)", _rev_stages),
             ("S11's total: the stages + on no counter + scout and main + (small work - D1's analysis)", _rev_total)],
+})
+
+
+def _d1_corr_median(g, rule, var):
+    return (g.one("D1R", "rules>%s>%s>g5_correction_only_q025_q50_q975>1" % (rule, var))
+            - g.one("D1R", "rules>%s>base>g5>g" % rule))
+
+
+def _d1_width_ratio(g, printed):
+    """The primary reading's interval of g5 with shot noise against the headline's: stored ends, or the ends as
+    printed (to 0.01 points)."""
+    lo, hi = g.all("D1L", "labels>A|cells>corrected_g5_ci95_with_shot_noise>*")
+    blo, bhi = g.all("D1R", "rules>A>base>g5>ci95>*")
+    if printed:
+        lo, hi, blo, bhi = (round(100 * x, 2) for x in (lo, hi, blo, bhi))
+    return (hi - lo) / (bhi - blo)
+
+
+def _dpj(g, name):
+    for s in g.src.load(KEYMAP["DPJ"][0])["scenarios"]:
+        if s["name"] == name:
+            return s
+    raise KeyError(name)
+
+
+# draft 9.1: the ledger's arithmetic for the fresh-eyes reading of draft 9 (rows V97, V98 and V100-V102)
+DERIVED.update({
+    "V97": [("D1R rules.%s.%s: the median of g5 from the correction alone less rules.%s.base.g5.g" % (r, v, r),
+             (lambda r, v: lambda g: _d1_corr_median(g, r, v))(r, v))
+            for r in ("A", "none") for v in ("posterior_diff_cells", "posterior_diff_pooled")],
+    "V98": [("D1R rules.A.posterior_diff_pooled.g5_with_shot_noise_q025_q50_q975[1], V2D3 census_growth.g3: "
+             "ln(1+g5) - ln(1+g3)",
+             lambda g: math.log1p(g.one("D1R", "rules>A>posterior_diff_pooled>g5_with_shot_noise_q025_q50_q975>1"))
+             - math.log1p(g.one("V2D3", "census_growth>g3")))],
+    "V100": [("D1L labels.A|cells.corrected_g5_ci95_with_shot_noise against D1R rules.A.base.g5.ci95: the ratio "
+              "of the widths", lambda g: _d1_width_ratio(g, False)),
+             ("the same ratio from the ends as printed (to 0.01 points)", lambda g: _d1_width_ratio(g, True))],
+    "V101": [("D1-4: rows done by workers 0 and 1 at the stops of 13 October",
+              lambda g: _decl_num(g, "D1-4", r"Worker 0: (\d+) of 1,250") + _decl_num(g, "D1-4", r"Worker 1: (\d+) of 1,250")),
+             ("D1R sample: mps_done, less the rows done at the stops of 13 October (D1-4)",
+              lambda g: g.one("D1R", "sample>mps_done") - _decl_num(g, "D1-4", r"Worker 0: (\d+) of 1,250")
+              - _decl_num(g, "D1-4", r"Worker 1: (\d+) of 1,250"))],
+    "V102": [("DPJ scenarios '(a) current allocation x2': cost_core_hours mps + sparse",
+              lambda g: sum(_dpj(g, "(a) current allocation x2")["cost_core_hours"].values())),
+             ("DPJ scenarios '(c) adverse sides, +250': cost_core_hours mps + sparse",
+              lambda g: sum(_dpj(g, "(c) adverse sides, +250")["cost_core_hours"].values())),
+             ("DPJ scenarios '(c) adverse sides, +50': cost_core_hours mps + sparse",
+              lambda g: sum(_dpj(g, "(c) adverse sides, +50")["cost_core_hours"].values()))],
 })
 
 
