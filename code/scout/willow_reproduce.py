@@ -49,6 +49,11 @@ posterior medians; L4 registers the arithmetic of ledger rows V97, V98 and V100-
 added; L4 registers the arithmetic of rows V107-V109 and of S11's new total (V93, V94). Draft 9.2
 (2026-10-24): decoder's D1-9, the one-off extension of D1 ([D1XR], [D1XL], [D1XM], [D1XS], [D1XD]), added; L3
 checks Table 4's and Table S20's rows for D1 u D1-9 beside D1's; L4 registers the arithmetic of rows V110-V119.
+Draft 9.3 (2026-10-24): scout's compute record to draft 9.3's completion ([SCPU2], [SCPU2M]) added; L3 tries
+the ends of Table S20's correction intervals in points before the other values of their keys (FIXED), and L4
+V117's (DERIVED_FIRST), where the plain match had met the upper end 0.0374 for the lower end's +0.04 points;
+L4 registers the arithmetic of rows V120-V122, and a computed-value key no longer applies to a row whose id
+continues its digits (V12's values are not V120's).
 """
 import argparse
 import csv
@@ -381,6 +386,9 @@ KEYMAP = {
     "OB": ["results/scout/willow_outside_band_share.json"],
     # scout: its compute since 22:54Z on 23 October (draft 9.1b; S11)
     "SCPU": ["results/scout/revision/compute/scout_cpu.json"], "SCPUM": ["results/scout/revision/compute/scout_cpu.md"],
+    # scout: its compute from 13:45Z on 24 October to draft 9.3's completion (draft 9.3; S11)
+    "SCPU2": ["results/scout/revision/compute/scout_cpu_d93.json"],
+    "SCPU2M": ["results/scout/revision/compute/scout_cpu_d93.md"],
     # texts: notes, boards, plans
     "PP": ["notes/decoder/willow_prereg.md"], "PR2": ["notes/decoder/willow_prereg_r2.md"],
     "PR3": ["notes/decoder/willow_prereg_r3.md"], "plan": ["notes/decoder/willow_final_analysis_plan.md"],
@@ -922,10 +930,14 @@ def _t3_row(dec, d3=None, d5=None):
 
 def _s20_row(rule, rd, ext=False):
     """Table S20's row: the labels' values, and (draft 9.1) the posterior medians, of g5 with shot noise and of the
-    correction alone (its median less the paper's g5); draft 9.2: D1 u D1-9's rows (ext) from [D1XL] and [D1XR]."""
+    correction alone (its median less the paper's g5); draft 9.2: D1 u D1-9's rows (ext) from [D1XL] and [D1XR];
+    draft 9.3: the ends of the correction's interval in points (x 100) first, since one end as a fraction can
+    meet the other's printed value (+0.04 points is 0.000374 x 100 and also 0.0374 x 1)."""
     var = "posterior_diff_cells" if rd == "cells" else "posterior_diff_pooled"
     lk, rk, ck = ("D1XL", "D1XR", "d1x_corr_median") if ext else ("D1L", "D1R", "d1_corr_median")
-    return [(lk, "labels>%s|%s" % (rule, rd)),
+    return [("FIXED", "%s:labels>%s|%s>correction_ci95>0" % (lk, rule, rd), 100.0, "correction"),
+            ("FIXED", "%s:labels>%s|%s>correction_ci95>1" % (lk, rule, rd), 100.0, "correction"),
+            (lk, "labels>%s|%s" % (rule, rd)),
             (rk, "rules>%s>%s>g5_with_shot_noise_q025_q50_q975>1" % (rule, var), "posterior median"),
             ("COMPUTED", "%s_%s|%s" % (ck, rule, rd), "", "posterior median")]
 
@@ -1249,7 +1261,7 @@ def check_tables(src, draft, results):
                             results.append(("L3", "NOT COVERED", label, tk.text))
                             say("NOT COVERED  L3 %s | %s: %s (reported)" % (label, header[ci], tk.text))
                 continue
-            SPECIAL = ("COMPUTED", "RATIO", "CI95", "CI95z1.96", "MINMAX")
+            SPECIAL = ("COMPUTED", "RATIO", "CI95", "CI95z1.96", "MINMAX", "FIXED")
             built = {}
 
             def cands_for(col):
@@ -1264,8 +1276,15 @@ def check_tables(src, draft, results):
                 tkey = tuple(sel)
                 if tkey in built:
                     return built[tkey]
-                specs, extra = [], []
+                specs, extra, first = [], [], []
                 for spec in sel:
+                    if spec[0] == "FIXED":  # draft 9.3: ('FIXED', KEY:path, scale, column): one stored value,
+                        try:              # tried at that scale before the keys
+                            first.append((_leaf(src, spec[1]), spec[1], float(spec[2])))
+                        except (KeyError, TypeError, ValueError, OSError) as e:
+                            say("FAIL  L3 %s: fixed-scale value %s not found (%s)" % (label, spec[1], e))
+                            results.append(("L3", "FAIL", label, "fixed-scale value %s not found" % (spec[1],)))
+                        continue
                     if spec[0] in SPECIAL:
                         try:
                             extra += special_values(src, spec, comp)
@@ -1281,18 +1300,24 @@ def check_tables(src, draft, results):
                         say("FAIL  L3 %s: key %s %s not found" % (label, key, path))
                         results.append(("L3", "FAIL", label, "key %s %s not found" % (key, path)))
                     specs.append(Spec(key, KEYMAP[key][0], hits))
-                built[tkey] = (Candidates(src, specs), extra)
+                built[tkey] = (Candidates(src, specs), extra, first)
                 return built[tkey]
 
             for ci, cell in enumerate(row):
                 if ci in skip or ci >= len(header):
                     continue
-                cands, extra = cands_for(header[ci])
+                cands, extra, first = cands_for(header[ci])
                 for tk in tokens(cell):
                     if tk.kind == "context":
                         results.append(("L3", "context", label, tk.text))
                         continue
-                    st, det = cands.match(tk, allow_file=False, allow_text=False)
+                    st, det = None, ""
+                    for val, ref, sc in first:
+                        if abs(val * sc - tk.value) <= tk.half * (1 + 1e-9):
+                            st, det = "PASS", "key [%s] %.10g ×%g (the scale fixed, tried first)" % (ref, val, sc)
+                            break
+                    if st != "PASS":
+                        st, det = cands.match(tk, allow_file=False, allow_text=False)
                     if st != "PASS":
                         for val, frm in extra:
                             for sc in (1.0, 100.0):
@@ -1773,6 +1798,86 @@ DERIVED.update({
 })
 
 
+# draft 9.3: the Monte Carlo precision of the labels' interval ends (V120), where D1-9's shots went (V121) and
+# scout's compute from 13:45Z on 24 October to draft 9.3's completion (V122, [SCPU2])
+def _mc_factor(g):
+    """The Monte Carlo SE of the 2.5% (or 97.5%) quantile of n draws as a share of the posterior's SD, by a normal
+    approximation: sqrt(p (1 - p) / n) / phi(z), n = D1XR rules.A.posterior_diff_pooled.draws."""
+    from statistics import NormalDist
+    nd = NormalDist()
+    return math.sqrt(0.025 * 0.975 / g.one("D1XR", "rules>A>posterior_diff_pooled>draws")) / nd.pdf(nd.inv_cdf(0.975))
+
+
+def _mc_lower(g, ref):
+    """(the lower end, its Monte Carlo SE) of a stored 95% interval of D1XL, the posterior's SD taken as the
+    interval's width / (2 z)."""
+    from statistics import NormalDist
+    lo, hi = g.all("D1XL", ref + ">*")
+    return lo, _mc_factor(g) * (hi - lo) / (2 * NormalDist().inv_cdf(0.975))
+
+
+_D93_ENDS = (("the pooled correction's lower end, rule A", "labels>A|pooled>correction_ci95"),
+             ("the pooled correction's lower end, no exclusion", "labels>none|pooled>correction_ci95"),
+             ("the primary reading's lower end of g5", "labels>A|cells>corrected_g5_ci95_with_shot_noise"))
+
+
+def _scpu2_window(g):
+    return g.one("SCPU2", "window>core_hours_unrounded")
+
+
+def _d93_line(g):
+    """S11's scout line, draft 9.3, the sum of its printed parts (each to 0.01): draft 9's 0.66 (decoder's post of
+    08:00:43Z), [SCPU]'s since_cutoff and [SCPU2]'s window."""
+    return (round(_post_num(g, "DB", "08:00:43Z", r"scout and main \[estimate\][^|]*\| (\d+\.\d+)"), 2)
+            + round(g.one("SCPU", "since_cutoff>core_hours"), 2) + round(_scpu2_window(g), 2))
+
+
+def _d93_total(g):
+    """S11's total, draft 9.3, the sum of its printed parts: draft 9.2's (V119) and [SCPU2]'s window, each to 0.01."""
+    return round(_rev_total_91b(g) + _d19_runs(g), 2) + round(_scpu2_window(g), 2)
+
+
+DERIVED.update({
+    "V120": ([("the quantile's level, 2.5%", lambda g: 0.025), ("the quantile's level, 97.5%", lambda g: 0.975),
+              ("z = the normal's 97.5% quantile", lambda g: __import__("statistics").NormalDist().inv_cdf(0.975)),
+              ("sqrt(0.025 x 0.975 / n) / phi(z), n = D1XR rules.A.posterior_diff_pooled.draws", _mc_factor)]
+             + [("%s: its Monte Carlo SE (D1XL %s)" % (nm, ref), (lambda ref: lambda g: _mc_lower(g, ref)[1])(ref))
+                for nm, ref in _D93_ENDS]
+             + [("%s: in Monte Carlo SEs above 0 (D1XL %s)" % (nm, ref),
+                 (lambda ref: lambda g: _mc_lower(g, ref)[0] / _mc_lower(g, ref)[1])(ref)) for nm, ref in _D93_ENDS]),
+    "V121": [("D1XD design.sides.C_high|*: the sum of n, the extension's shots on C_high's six sides",
+              lambda g: sum(g.all("D1XD", "design>sides>C_high|*>n"))),
+             ("D1XD design.sides: the sum of n, the extension's shots", lambda g: sum(g.all("D1XD", "design>sides>*>n")))],
+    "V122": [("DB 08:00:43Z: S11's scout line of draft 9, 0.66",
+              lambda g: _post_num(g, "DB", "08:00:43Z", r"scout and main \[estimate\][^|]*\| (\d+\.\d+)")),
+             _D91B_Y,
+             ("S11's scout line, draft 9.3: 0.66 + [SCPU]'s 0.20 + [SCPU2]'s window, as printed", _d93_line),
+             ("S11's total, draft 9.2 (V119): draft 9.1b's + D1-9's runs", lambda g: _rev_total_91b(g) + _d19_runs(g)),
+             ("S11's total, draft 9.3: draft 9.2's + [SCPU2]'s window, as printed", _d93_total)],
+})
+
+# draft 9.3: values L4 tries at one scale before a row's cited keys, where a plain match meets another value of
+# the same key first: V117's +0.04 points is its lower end 0.000374 x 100, and also its upper end 0.0374 x 1
+DERIVED_FIRST = {
+    "V117": [("D1XL labels.none|pooled.correction_ci95.%d" % i, 100.0,
+              (lambda i: lambda g: g.one("D1XL", "labels>none|pooled>correction_ci95>%d" % i))(i)) for i in (0, 1)],
+}
+
+
+def derived_first(g, rname, tk):
+    """('PASS', detail) when one of DERIVED_FIRST's values for the row (its id exactly) meets the token at its
+    scale, else (None, '')."""
+    for desc, sc, fn in DERIVED_FIRST.get(rname, []):
+        try:
+            val = fn(g)
+        except Exception as e:  # noqa: BLE001 - reported; the row's cited keys are tried next
+            say("ERROR L4 %s: %s not formed (%s)" % (rname, desc, e))
+            continue
+        if abs(val * sc - tk.value) <= tk.half * (1 + 1e-9) + 1e-12 * abs(tk.value):
+            return "PASS", "key [%s] %.10g ×%g (the scale fixed, tried first)" % (desc, val, sc)
+    return None, ""
+
+
 def _d1_g5(g, rd, nm):
     lab = g.src.load(KEYMAP["D1L"][0])["labels"][rd]
     return lab["corrected_g5"] if nm == "point" else lab["corrected_g5_ci95_with_shot_noise"][0 if nm == "lo" else 1]
@@ -1781,7 +1886,9 @@ def _d1_g5(g, rd, nm):
 def derived_for(g, rname):
     out = []
     for k, items in DERIVED.items():
-        if rname == k or rname.startswith(k):
+        # a key applies to its row and to rows that continue its id with a letter (V114a), not with a digit
+        # (draft 9.3: V12's values are not V120's)
+        if rname == k or (rname.startswith(k) and not (k[-1:].isdigit() and rname[len(k):len(k) + 1].isdigit())):
             for desc, fn in items:
                 try:
                     out.append((fn(g), desc))
@@ -1821,7 +1928,9 @@ def check_ledger(src, ledger_text, results):
                 if tk.kind == "context":
                     results.append(("L4", "context", rname, tk.text))
                     continue
-                st, det = (cands.match(tk, allow_file=False, allow_text=False) if cands else (None, ""))
+                st, det = derived_first(getter, rname, tk)
+                if st != "PASS":
+                    st, det = (cands.match(tk, allow_file=False, allow_text=False) if cands else (None, ""))
                 if st != "PASS":
                     for val, desc in derived_for(getter, rname):
                         if val is None:
