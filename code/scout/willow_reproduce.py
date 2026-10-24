@@ -329,6 +329,7 @@ KEYMAP = {
     "R1P": ["results/reservoir/willow_revision/r1_phase1/r1_posthoc.json"],
     "R2A": ["results/reservoir/willow_revision/r12_final/r2_analysis.json"],
     "R12C": ["results/reservoir/willow_revision/r12_final/r1_certificate.json"],
+    "R4A": ["results/reservoir/willow_revision/r4/r4_analysis.json"],
     # scout: regenerated in L1
     "K2F": ["results/scout/willow_k2_summary.json"], "SDF": ["results/scout/willow_derived_final.json"],
     "GRF": ["results/scout/willow_growth_re_final.json"], "OBF": ["results/scout/willow_outside_band_share_final.json"],
@@ -930,6 +931,13 @@ TABLES = [
         ("D̂, class scales", [("V2D3", "b9>D_hat"), ("F1", "primary_m_D")]),
         ("T̂_mech", [("V2D3", "b9>T_hat_mech"), ("EX", "heldout>Tm>m_X"), ("TMP", "Tm_all_18")]),
         ("D̂_mech", [("V2D3", "b9>D_hat_mech"), ("EX", "heldout>Dm>m_X")]),
+        # R4 (draft 8.1, post hoc): the class-scale syndrome fit, matched to D-hat in everything but its objective
+        ("S\u0302, class scales", [("R4A", "matched_S_converged>errors>RL_vs_S", "m, %"),
+                              ("R4A", "matched_S_converged>calibration>S>ML", "R ("),
+                              ("R4A", "matched_S_converged>calibration>S>ML>conf", "R_conf"),
+                              ("COMPUTED", "r4_S_rconf_se", "", "R_conf"),
+                              ("R4A", "matched_S_converged>calibration>S>share_of_RL_excess_removed>R", "share"),
+                              ("R4A", "matched_S_converged>logloss>diff_RL-S", "log-loss")]),
     ]),
     ("supplement", "Table S7.", [0, 5], [
         ("Libra (shipped)", [("V2D3", "g3_W5"), ("FR", "decisions>d5_rules>A>g5"),
@@ -1007,6 +1015,11 @@ def computed_values(src):
     pc = src.load(KEYMAP["FA"][0])["pooled_counts"]["d5|libra.rl vs ML.rl"]
     out["count_gap_if_ml_1pct_low"] = [(pc["errors_A"] / (1.01 * pc["errors_B"]) - 1,
                                         "FA pooled_counts.d5|libra.rl vs ML.rl: errors_A/(1.01 errors_B) - 1")]
+    # R4 (draft 8.1): R_conf's SE for S-hat, R_conf/sqrt(k) for its k errors on the confident shots (as Table 5's
+    # other rows; ledger V18 and V70)
+    conf = src.load(KEYMAP["R4A"][0])["matched_S_converged"]["calibration"]["S"]["ML"]["conf"]
+    out["r4_S_rconf_se"] = [(conf["ratio"] / math.sqrt(conf["errors"]),
+                             "R4A matched_S_converged.calibration.S.ML.conf: ratio/sqrt(errors)")]
     return out
 
 
@@ -1313,6 +1326,33 @@ DERIVED = {
     "4a: P1's SE raised": [("SEC full_delta_method_inflated.se / AM3 P1_libra_vs_ML_rl_d3.pooled.se_rel - 1",
                            lambda g: g.one("SEC", "full_delta_method_inflated>se") / g.one("AM3", "P1_libra_vs_ML_rl_d3>pooled>se_rel") - 1)],
 }
+
+
+_R4E = "matched_S_converged>errors>"
+_R4M = "scales>median_over_series>*>"
+
+
+def _r4_sum(g, field):
+    return sum(g.all("R4A", "scales>per_series>*>%s" % field))
+
+
+# R4 (draft 8.1): the ledger's arithmetic on R4's analysis (rows V68, V70, V73, V74 and V75)
+DERIVED.update({
+    "V68": [("R4A errors.RL_vs_S: errors_B/errors_A - 1 (S-hat's change in ML(RL)'s errors)",
+             lambda g: g.one("R4A", _R4E + "RL_vs_S>errors_B") / g.one("R4A", _R4E + "RL_vs_S>errors_A") - 1),
+            ("R4A errors.RL_vs_D: 1 - errors_B/errors_A (D-hat's cut in ML(RL)'s errors)",
+             lambda g: 1 - g.one("R4A", _R4E + "RL_vs_D>errors_B") / g.one("R4A", _R4E + "RL_vs_D>errors_A"))],
+    "V70": [("R4A calibration.S.ML.conf: ratio/sqrt(errors) (R_conf's SE, as V18)",
+             lambda g: g.one("R4A", "matched_S_converged>calibration>S>ML>conf>ratio")
+             / math.sqrt(g.one("R4A", "matched_S_converged>calibration>S>ML>conf>errors")))],
+    "V73": [("R4A scales.median_over_series: the least median of S", lambda g: min(g.all("R4A", _R4M + "S"))),
+            ("R4A scales.median_over_series: the largest median of S", lambda g: max(g.all("R4A", _R4M + "S"))),
+            ("R4A scales.median_over_series: the least median of D", lambda g: min(g.all("R4A", _R4M + "D"))),
+            ("R4A scales.median_over_series: the largest median of D", lambda g: max(g.all("R4A", _R4M + "D")))],
+    "V74": [("R4A scales.per_series: n_eval summed over the 18 series", lambda g: _r4_sum(g, "n_eval"))],
+    "V75": [("R4A scales.per_series: cpu_seconds_total summed over the 18 series (the guard's counter)",
+             lambda g: _r4_sum(g, "cpu_seconds_total"))],
+})
 
 
 def derived_for(g, rname):
